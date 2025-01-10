@@ -1,0 +1,14 @@
+D:\Projects\BlackjackApp\BlackjackApp\bin\Debug\net6.0\BlackjackApp.exe
+D:\Projects\BlackjackApp\BlackjackApp\bin\Debug\net6.0\BlackjackApp.deps.json
+D:\Projects\BlackjackApp\BlackjackApp\bin\Debug\net6.0\BlackjackApp.runtimeconfig.json
+D:\Projects\BlackjackApp\BlackjackApp\bin\Debug\net6.0\BlackjackApp.dll
+D:\Projects\BlackjackApp\BlackjackApp\bin\Debug\net6.0\BlackjackApp.pdb
+D:\Projects\BlackjackApp\BlackjackApp\obj\Debug\net6.0\BlackjackApp.GeneratedMSBuildEditorConfig.editorconfig
+D:\Projects\BlackjackApp\BlackjackApp\obj\Debug\net6.0\BlackjackApp.AssemblyInfoInputs.cache
+D:\Projects\BlackjackApp\BlackjackApp\obj\Debug\net6.0\BlackjackApp.AssemblyInfo.cs
+D:\Projects\BlackjackApp\BlackjackApp\obj\Debug\net6.0\BlackjackApp.csproj.CoreCompileInputs.cache
+D:\Projects\BlackjackApp\BlackjackApp\obj\Debug\net6.0\BlackjackApp.dll
+D:\Projects\BlackjackApp\BlackjackApp\obj\Debug\net6.0\refint\BlackjackApp.dll
+D:\Projects\BlackjackApp\BlackjackApp\obj\Debug\net6.0\BlackjackApp.pdb
+D:\Projects\BlackjackApp\BlackjackApp\obj\Debug\net6.0\BlackjackApp.genruntimeconfig.cache
+D:\Projects\BlackjackApp\BlackjackApp\obj\Debug\net6.0\ref\BlackjackApp.dll
