@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BlackjackApp
 {
-    internal class Card
+    public class Card
     {
         private string Rank { get; set; }
         public Helper.Suit Suit { get; set; }
@@ -30,7 +30,7 @@ namespace BlackjackApp
         }
         public override string ToString()
         {
-            return Rank + " Of " + Suit+" = "+Value.ToString(); 
+            return Rank + " Of " + Suit; 
         }
     }
 }

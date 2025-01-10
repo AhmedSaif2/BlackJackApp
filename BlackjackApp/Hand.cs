@@ -7,18 +7,30 @@ using System.Threading.Tasks;
 
 namespace BlackjackApp
 {
-    internal class Hand
+    public class Hand
     {
         private List<Card> Cards;
-        private int sum;
+        private int Sum;
         public Hand() { 
             Cards = new List<Card>();
-            sum = 0;
+            Sum = 0;
         }
         public void AddCard(Card card)
         {
             Cards.Add(card);
-            sum += card.Value;
+            Sum += card.Value;
+        }
+        public int GetSum()
+        {
+            return Sum;
+        }
+        public bool IsBlackJack()
+        {
+            return Sum == 21;
+        }
+        public bool IsValidHand()
+        {
+            return Sum <= 21;
         }
         public void ShowHand()
         {
@@ -26,15 +38,8 @@ namespace BlackjackApp
             {
                 Console.WriteLine(card);
             }
-            Console.WriteLine("Current Sum = "+ getSum());
+            Console.WriteLine("Current Sum = "+ GetSum());
         }
-        public int getSum()
-        {
-            return sum;
-        }
-        public bool IsValidHand()
-        {
-            return sum <= 21;
-        }
+
     }
 }
