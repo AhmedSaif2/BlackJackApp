@@ -6,25 +6,18 @@ using System.Threading.Tasks;
 
 namespace BlackjackApp
 {
-    public class Player
+    public class Player : Participant
     {
-        public string?Name { get; set; }
-        public Hand CurrentHand { get; set; }
         private int PocketMoney;
         //public int PocketMoney { get; set; }
-        public Player() { 
-            CurrentHand = new Hand();
-        }
+        
         public Player(string name,int pocketMoney) { 
             Name= name;
             PocketMoney= pocketMoney;
             CurrentHand=new Hand();
         }
-        public void SeeHand()
-        {
-            CurrentHand.ShowHand();
-        }
-        public virtual int MakeChoice()
+        
+        public override int MakeChoice()
         {
             // 1 for Hit
             // 2 for Stand
@@ -33,10 +26,6 @@ namespace BlackjackApp
             return Convert.ToInt32(choice);
         }
 
-        public void AddCard(Card card)
-        {
-            CurrentHand.AddCard(card);
-        }
         public bool PlaceBet(int bet)
         {
             if (bet <= PocketMoney)
@@ -44,11 +33,8 @@ namespace BlackjackApp
                 PocketMoney -= bet;
                 return true;
             }
-            else
-            {
-                Console.WriteLine("Not Enough Pocket Money!");
-                return false;
-            }
+            Console.WriteLine("Not Enough Pocket Money!");
+            return false;
         }
         public int GetPocketMoney()
         {
@@ -60,9 +46,6 @@ namespace BlackjackApp
             PocketMoney += bet;
         }
 
-        public void ResetHand()
-        {
-            CurrentHand= new Hand();
-        }
+        
     }
 }

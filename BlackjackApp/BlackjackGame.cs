@@ -61,7 +61,7 @@ namespace BlackjackApp
                 Console.WriteLine("The Dealer Won !");
             }
         }
-        private int GetTurnScore(Player player)
+        private int GetTurnScore(Participant player)
         {
             Dealer.DealCard(Deck, player);
             Dealer.DealCard(Deck, player);

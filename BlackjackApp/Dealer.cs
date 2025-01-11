@@ -6,14 +6,9 @@ using System.Threading.Tasks;
 
 namespace BlackjackApp
 {
-    public class Dealer : Player
+    public class Dealer : Participant
     {
-        public Dealer() : base()
-        {
-            Name = "Dealer"; 
-        }
-
-        public void DealCard(DeckOfCards deck,Player player)
+        public void DealCard(DeckOfCards deck,Participant player)
         {
             Card card = deck.NextCard();
             deck.RemoveCard(card);
