@@ -11,16 +11,28 @@ namespace BlackjackApp
         private Dealer Dealer;
         private Player Player;
         private DeckOfCards Deck;
-        public BlackjackGame()
+        public BlackjackGame(Dealer dealer,Player player)
         {
-            Dealer = new Dealer();
-            Console.WriteLine("Please Enter Your Name: ");
-            string PlayerName=Console.ReadLine();
-            Player = new Player(PlayerName,100);
+            Dealer = dealer;
+            Player = player;
+
+            Player.ResetHand();
+            Dealer.ResetHand();
 
             Deck=new DeckOfCards();
             Deck.ShuffleDeck();
 
+            Console.WriteLine(" -------------------------- Player's turn --------------------------");
+            Console.WriteLine("Current Pocket Money = " + Player.GetPocketMoney());
+            Console.WriteLine("Place a bet");
+
+            int bet = Convert.ToInt32(Console.ReadLine());
+            while (!Player.PlaceBet(bet))
+            {
+                Console.WriteLine("Please Enter a valid amount");
+                bet=Convert.ToInt32(Console.ReadLine());
+            }
+            
             // Player's Turn 
             int PlayerScore = GetTurnScore(Player);
             if (PlayerScore > 21)
@@ -29,16 +41,20 @@ namespace BlackjackApp
                 return;
             }
 
+            Console.WriteLine(" -------------------------- Dealer's turn --------------------------");
+
             int DealerScore = GetTurnScore(Dealer);
             // Dealer's Turn 
 
             if (DealerScore > 21 || PlayerScore > DealerScore)
             {
                 Console.WriteLine(Player.Name+" Won !");
+                Player.AddToPocketMoney(bet*2);
             }
             else if (PlayerScore == DealerScore)
             {
                 Console.WriteLine("Draw!");
+                Player.AddToPocketMoney(bet);
             }
             else
             {
@@ -71,6 +87,8 @@ namespace BlackjackApp
                 {
                     break;
                 }
+                Thread.Sleep(2000);
+
             }
             return player.CurrentHand.GetSum(); 
         }

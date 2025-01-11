@@ -1,8 +1,17 @@
 ﻿using BlackjackApp;
 
 
+Console.WriteLine("-------------------------- New Game --------------------------");
+Console.WriteLine("Please Enter Your Name: ");
+
+string PlayerName = Console.ReadLine();
+Player player = new Player(PlayerName, 2500);
+
+Dealer dealer = new Dealer(); 
+
+
 while (true)
 {
-    Console.WriteLine("-------------------------- New Game --------------------------");
-    BlackjackGame Game = new BlackjackGame();
+    BlackjackGame Game = new BlackjackGame(dealer,player);
+    if (player.GetPocketMoney() == 0) return;
 }
