@@ -10,6 +10,7 @@ namespace BlackjackApp
     {
         private Dealer Dealer;
         private Player Player;
+        private DeckOfCards Deck;
         public BlackjackGame()
         {
             Dealer = new Dealer();
@@ -17,73 +18,25 @@ namespace BlackjackApp
             string PlayerName=Console.ReadLine();
             Player = new Player(PlayerName,100);
 
-            DeckOfCards deck=new DeckOfCards();
-            deck.ShuffleDeck();
+            Deck=new DeckOfCards();
+            Deck.ShuffleDeck();
 
-            Dealer.DealCard(deck,Player);
-            Dealer.DealCard(deck,Player);
             // Player's Turn 
-            while (true)
-            {
-                Player.SeeHand();
-                if (Player.CurrentHand.IsBlackJack())
-                {
-                    Console.WriteLine("Blackjack!");
-                    break;
-                }
-                if (!Player.CurrentHand.IsValidHand())
-                {
-                    break;
-                }
-                Console.WriteLine("Type 1 to Hit Or 2 To Stand");
-                int choice=Player.MakeChoice();
-                if (choice == 1)
-                {
-                    Dealer.DealCard(deck,Player);
-                }
-                else if (choice == 2)
-                {
-                    break;
-                }
-            }
-            int PlayerScore = Player.CurrentHand.GetSum();
+            int PlayerScore = GetTurnScore(Player);
             if (PlayerScore > 21)
             {
                 Console.WriteLine("You Lost!");
                 return;
             }
 
+            int DealerScore = GetTurnScore(Dealer);
             // Dealer's Turn 
-            Dealer.DealCard(deck, Dealer);
-            Dealer.DealCard(deck, Dealer);
-            while (true)
-            {
-                Dealer.SeeHand();
-                if (Dealer.CurrentHand.IsBlackJack())
-                {
-                    Console.WriteLine("Blackjack!");
-                    break;
-                }
-                if (!Dealer.CurrentHand.IsValidHand())
-                {
-                    break;
-                }
-                int choice = Dealer.MakeChoice();
-                if (choice == 1)
-                {
-                    Dealer.DealCard(deck, Dealer);
-                }
-                else if (choice == 2)
-                {
-                    break;
-                }
-            }
 
-            if (Dealer.CurrentHand.GetSum()>21||Player.CurrentHand.GetSum()>Dealer.CurrentHand.GetSum())
+            if (DealerScore > 21 || PlayerScore > DealerScore)
             {
                 Console.WriteLine(Player.Name+" Won !");
             }
-            else if (Player.CurrentHand.GetSum() == Dealer.CurrentHand.GetSum())
+            else if (PlayerScore == DealerScore)
             {
                 Console.WriteLine("Draw!");
             }
@@ -91,6 +44,35 @@ namespace BlackjackApp
             {
                 Console.WriteLine("The Dealer Won !");
             }
+        }
+        private int GetTurnScore(Player player)
+        {
+            Dealer.DealCard(Deck, player);
+            Dealer.DealCard(Deck, player);
+            // Player's Turn 
+            while (true)
+            {
+                player.SeeHand();
+                if (player.CurrentHand.IsBlackJack())
+                {
+                    Console.WriteLine("Blackjack!");
+                    break;
+                }
+                if (!player.CurrentHand.IsValidHand())
+                {
+                    break;
+                }
+                int choice = player.MakeChoice();
+                if (choice == 1)
+                {
+                    Dealer.DealCard(Deck, player);
+                }
+                else if (choice == 2)
+                {
+                    break;
+                }
+            }
+            return player.CurrentHand.GetSum(); 
         }
     }
 }

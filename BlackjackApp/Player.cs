@@ -28,6 +28,7 @@ namespace BlackjackApp
         {
             // 1 for Hit
             // 2 for Stand
+            Console.WriteLine("Type 1 to Hit Or 2 To Stand");
             string choice = Console.ReadLine();
             return Convert.ToInt32(choice);
         }
