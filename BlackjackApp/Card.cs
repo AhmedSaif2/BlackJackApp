@@ -15,13 +15,17 @@ namespace BlackjackApp
         {
             Rank = rank;
             Suit = suit;
-            if (Rank.Length == 1 && Rank[0] >= '1' && Rank[0] <= '9') 
+            if (Rank.Length == 1 && Rank[0] >= '2' && Rank[0] <= '9') 
             {
                 Value = Rank[0] - '0';
             }
             else if (Rank == "10" || Rank.ToLower() == "jack" || Rank.ToLower() == "queen" || Rank.ToLower() == "king") 
             {
                 Value = 10;
+            }
+            else if (Rank.ToLower() == "ace")
+            {
+                Value = 11;
             }
             else
             {

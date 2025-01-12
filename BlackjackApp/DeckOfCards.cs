@@ -13,7 +13,7 @@ namespace BlackjackApp
         public DeckOfCards()
         {
             Cards = new List<Card>();
-            for (int i = 1; i <= 10; i++)
+            for (int i = 2; i <= 10; i++)
             {
                 string rank=i.ToString();
                 Helper.AddAllSuits(Cards, rank);
@@ -21,6 +21,7 @@ namespace BlackjackApp
             Helper.AddAllSuits(Cards, "jack");
             Helper.AddAllSuits(Cards, "queen");
             Helper.AddAllSuits(Cards, "king");
+            Helper.AddAllSuits(Cards, "Ace");
         }
         public void ShuffleDeck()
         {

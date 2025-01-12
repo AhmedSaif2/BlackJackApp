@@ -8,6 +8,11 @@ namespace BlackjackApp
 {
     public class Dealer : Participant
     {
+        public Dealer() : base()
+        {
+            Name = "The Dealer"; 
+        }
+
         public void DealCard(DeckOfCards deck,Participant player)
         {
             Card card = deck.NextCard();

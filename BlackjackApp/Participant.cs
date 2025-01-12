@@ -15,6 +15,10 @@ namespace BlackjackApp
             CurrentHand = new Hand();
         }
         public abstract int MakeChoice();
+        public string GetName()
+        {
+            return Name;
+        }
         public void SeeHand()
         {
             CurrentHand.ShowHand();

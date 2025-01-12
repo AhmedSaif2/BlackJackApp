@@ -11,14 +11,25 @@ namespace BlackjackApp
     {
         private List<Card> Cards;
         private int Sum;
+        private int AceCount;
         public Hand() { 
             Cards = new List<Card>();
             Sum = 0;
+            AceCount = 0;
         }
         public void AddCard(Card card)
         {
             Cards.Add(card);
+            if (card.Value == 11)
+            {
+                AceCount++;
+            }
             Sum += card.Value;
+            if (Sum > 21 &&AceCount > 0)
+            {
+                AceCount--;
+                Sum -= 10;
+            }
         }
         public int GetSum()
         {
@@ -28,9 +39,9 @@ namespace BlackjackApp
         {
             return Sum == 21;
         }
-        public bool IsValidHand()
+        public bool IsBust()
         {
-            return Sum <= 21;
+            return Sum > 21;
         }
         public void ShowHand()
         {
