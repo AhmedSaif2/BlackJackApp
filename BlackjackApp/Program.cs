@@ -13,5 +13,6 @@ Dealer dealer = new Dealer();
 while (true)
 {
     BlackjackGame Game = new BlackjackGame(dealer,player);
+    Game.SetBet(50);
     if (player.GetPocketMoney() == 0) return;
 }

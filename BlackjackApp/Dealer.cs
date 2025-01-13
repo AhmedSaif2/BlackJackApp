@@ -13,11 +13,12 @@ namespace BlackjackApp
             Name = "The Dealer"; 
         }
 
-        public void DealCard(DeckOfCards deck,Participant player)
+        public Card DealCard(DeckOfCards deck,Participant player)
         {
             Card card = deck.NextCard();
             deck.RemoveCard(card);
             player.AddCard(card);
+            return card;
         }
         public override int MakeChoice()
         {

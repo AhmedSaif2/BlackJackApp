@@ -11,6 +11,7 @@ namespace BlackjackApp
         private Dealer Dealer;
         private Player Player;
         private DeckOfCards Deck;
+        private int Bet;
         public BlackjackGame(Dealer dealer,Player player)
         {
             Dealer = dealer;
@@ -26,12 +27,6 @@ namespace BlackjackApp
             Console.WriteLine("Current Pocket Money = " + Player.GetPocketMoney());
             Console.WriteLine("Place a bet");
 
-            int bet = Convert.ToInt32(Console.ReadLine());
-            while (!Player.PlaceBet(bet))
-            {
-                Console.WriteLine("Please Enter a valid amount");
-                bet=Convert.ToInt32(Console.ReadLine());
-            }
             
             // Player's Turn 
             int PlayerScore = GetTurnScore(Player);
@@ -49,12 +44,12 @@ namespace BlackjackApp
             if (DealerScore > 21 || PlayerScore > DealerScore)
             {
                 Console.WriteLine(Player.GetName()+" Won !");
-                Player.AddToPocketMoney(bet*2);
+                Player.AddToPocketMoney(Bet * 2);
             }
             else if (PlayerScore == DealerScore)
             {
                 Console.WriteLine("Draw!");
-                Player.AddToPocketMoney(bet);
+                Player.AddToPocketMoney(Bet);
             }
             else
             {
@@ -92,6 +87,10 @@ namespace BlackjackApp
 
             }
             return participant.CurrentHand.GetSum(); 
+        }
+        public void SetBet(int bet)
+        {
+            Bet = bet;
         }
     }
 }
