@@ -27,15 +27,36 @@ namespace BlackjackAppUI
         public GamePage(Player player, int bet)
         {
             InitializeComponent();
-            
+
             deck = new DeckOfCards();
             dealer = new Dealer();
-            
+
+            ImageList imageList = new ImageList
+            {
+                ImageSize = new System.Drawing.Size(70, 100) // Set size of images
+            };
+
+            foreach (Card item in deck.GetListOfCards())
+            {
+                imageList.Images.Add(item.ToString(), System.Drawing.Image.FromFile("playing_cards/" + item.ToString() + ".png"));
+
+            }
+
+            // Assign the ImageList to the ListView
+            playerList.LargeImageList = imageList;
+            DealerList.LargeImageList = imageList;
+
+            playerList.View = View.LargeIcon;
+            DealerList.View = View.LargeIcon;
+
+            // Add items to the ListView
+
+
             this.player = player;
             this.bet = bet;
-            
+
             player.AddToPocketMoney(-bet);
-            
+
             player.ResetHand();
             dealer.ResetHand();
 
@@ -49,19 +70,29 @@ namespace BlackjackAppUI
             HitButton.PerformClick();
             HitButton.PerformClick();
 
-            DealerList.Items.Add(dealer.DealCard(deck, dealer).ToString());
-            DealerSumLabel.Text = dealer.CurrentHand.GetSum().ToString();
+            string cardDetails = dealer.DealCard(deck, dealer).ToString();
+            var card = new ListViewItem(cardDetails)
+            {
+                ImageKey = cardDetails
+            };
+            DealerList.Items.Add(card);
+            DealerSumLabel.Text = "Sum = " + dealer.CurrentHand.GetSum().ToString();
 
             // Dealer Play
-            
+
         }
 
-       
+
 
         private void HitButton_Click(object sender, EventArgs e)
         {
-            playerList.Items.Add(dealer.DealCard(deck, player).ToString());
-            PlayerSumLabel.Text = player.CurrentHand.GetSum().ToString();
+            string cardDetails = dealer.DealCard(deck, player).ToString();
+            var card = new ListViewItem(cardDetails)
+            {
+                ImageKey = cardDetails
+            };
+            playerList.Items.Add(card);
+            PlayerSumLabel.Text = "Sum = " + player.CurrentHand.GetSum().ToString();
 
             if (player.CurrentHand.IsBust())
             {
@@ -84,7 +115,7 @@ namespace BlackjackAppUI
         }
         private void DealerTurnTimer_Tick(object sender, EventArgs e)
         {
-            if (dealer.CurrentHand.IsBlackJack()||dealer.CurrentHand.IsBust())
+            if (dealer.CurrentHand.IsBlackJack() || dealer.CurrentHand.IsBust())
             {
                 dealerTurnTimer.Stop();
                 DetermineWinner();
@@ -93,8 +124,13 @@ namespace BlackjackAppUI
             int choice = dealer.MakeChoice();
             if (choice == 1)
             {
-                DealerList.Items.Add(dealer.DealCard(deck, dealer).ToString());
-                DealerSumLabel.Text = dealer.CurrentHand.GetSum().ToString();
+                string cardDetails = dealer.DealCard(deck, dealer).ToString();
+                var card = new ListViewItem(cardDetails)
+                {
+                    ImageKey = cardDetails
+                };
+                DealerList.Items.Add(card);
+                DealerSumLabel.Text = "Sum = " + dealer.CurrentHand.GetSum().ToString();
             }
             else if (choice == 2)
             {

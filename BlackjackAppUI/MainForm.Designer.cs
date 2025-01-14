@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             MainPanel = new Panel();
             SuspendLayout();
             // 
@@ -45,8 +46,9 @@
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(792, 530);
             Controls.Add(MainPanel);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "MainForm";
-            Text = "MainForm";
+            Text = "Blackjack";
             ResumeLayout(false);
         }
 

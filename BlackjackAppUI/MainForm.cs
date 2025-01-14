@@ -41,15 +41,10 @@ namespace BlackjackAppUI
         private void StartGame(Player player, int betAmount)
         {
             MainPanel.Controls.Clear();
-            GamePage gamePage = new GamePage(player,betAmount);
-            gamePage.OnBackToBettingPage += (player)=> LoadBettingPage(player); 
+            GamePage gamePage = new GamePage(player, betAmount);
+            gamePage.OnBackToBettingPage += (player) => LoadBettingPage(player);
             MainPanel.Controls.Add(gamePage);
             gamePage.Dock = DockStyle.Fill;
-        }
-
-        private void welcomePage1_Load(object sender, EventArgs e)
-        {
-
         }
     }
 }

@@ -53,5 +53,10 @@ namespace BlackjackApp
         {
             Cards.Remove(card);
         }
+
+        public IEnumerable<Card> GetListOfCards()
+        {
+            return Cards;
+        }
     }
 }

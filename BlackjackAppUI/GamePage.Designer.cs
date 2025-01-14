@@ -40,9 +40,11 @@
             // 
             // playerList
             // 
-            playerList.Location = new Point(258, 287);
+            playerList.BackColor = Color.SeaGreen;
+            playerList.BorderStyle = BorderStyle.None;
+            playerList.Location = new Point(65, 287);
             playerList.Name = "playerList";
-            playerList.Size = new Size(222, 134);
+            playerList.Size = new Size(642, 134);
             playerList.TabIndex = 1;
             playerList.UseCompatibleStateImageBehavior = false;
             playerList.View = View.List;
@@ -51,7 +53,8 @@
             // 
             PlayerSumLabel.AutoSize = true;
             PlayerSumLabel.Font = new Font("Segoe UI", 20F, FontStyle.Regular, GraphicsUnit.Point);
-            PlayerSumLabel.Location = new Point(512, 333);
+            PlayerSumLabel.ForeColor = Color.White;
+            PlayerSumLabel.Location = new Point(490, 453);
             PlayerSumLabel.Name = "PlayerSumLabel";
             PlayerSumLabel.Size = new Size(116, 37);
             PlayerSumLabel.TabIndex = 2;
@@ -59,31 +62,35 @@
             // 
             // HitButton
             // 
+            HitButton.BackColor = Color.White;
+            HitButton.Cursor = Cursors.Hand;
             HitButton.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
-            HitButton.Location = new Point(362, 437);
+            HitButton.Location = new Point(91, 453);
             HitButton.Name = "HitButton";
             HitButton.Size = new Size(118, 44);
             HitButton.TabIndex = 3;
             HitButton.Text = "Hit";
-            HitButton.UseVisualStyleBackColor = true;
+            HitButton.UseVisualStyleBackColor = false;
             HitButton.Click += HitButton_Click;
             // 
             // StandButton
             // 
+            StandButton.BackColor = Color.White;
             StandButton.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
-            StandButton.Location = new Point(512, 437);
+            StandButton.Location = new Point(254, 453);
             StandButton.Name = "StandButton";
             StandButton.Size = new Size(118, 44);
             StandButton.TabIndex = 4;
             StandButton.Text = "Stand";
-            StandButton.UseVisualStyleBackColor = true;
+            StandButton.UseVisualStyleBackColor = false;
             StandButton.Click += StandButton_Click;
             // 
             // label1
             // 
             label1.AutoSize = true;
             label1.Font = new Font("Segoe UI", 20F, FontStyle.Regular, GraphicsUnit.Point);
-            label1.Location = new Point(47, 81);
+            label1.ForeColor = Color.White;
+            label1.Location = new Point(65, 16);
             label1.Name = "label1";
             label1.Size = new Size(168, 37);
             label1.TabIndex = 6;
@@ -93,7 +100,8 @@
             // 
             label2.AutoSize = true;
             label2.Font = new Font("Segoe UI", 20F, FontStyle.Regular, GraphicsUnit.Point);
-            label2.Location = new Point(47, 319);
+            label2.ForeColor = Color.White;
+            label2.Location = new Point(65, 233);
             label2.Name = "label2";
             label2.Size = new Size(144, 37);
             label2.TabIndex = 7;
@@ -101,9 +109,11 @@
             // 
             // DealerList
             // 
-            DealerList.Location = new Point(258, 41);
+            DealerList.BackColor = Color.SeaGreen;
+            DealerList.BorderStyle = BorderStyle.None;
+            DealerList.Location = new Point(65, 56);
             DealerList.Name = "DealerList";
-            DealerList.Size = new Size(222, 134);
+            DealerList.Size = new Size(642, 134);
             DealerList.TabIndex = 8;
             DealerList.UseCompatibleStateImageBehavior = false;
             DealerList.View = View.List;
@@ -112,7 +122,8 @@
             // 
             DealerSumLabel.AutoSize = true;
             DealerSumLabel.Font = new Font("Segoe UI", 20F, FontStyle.Regular, GraphicsUnit.Point);
-            DealerSumLabel.Location = new Point(512, 92);
+            DealerSumLabel.ForeColor = Color.White;
+            DealerSumLabel.Location = new Point(490, 16);
             DealerSumLabel.Name = "DealerSumLabel";
             DealerSumLabel.Size = new Size(116, 37);
             DealerSumLabel.TabIndex = 9;
@@ -122,6 +133,7 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
+            BackColor = Color.SeaGreen;
             Controls.Add(DealerSumLabel);
             Controls.Add(DealerList);
             Controls.Add(label2);

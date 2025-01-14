@@ -24,3 +24,4 @@ D:\Projects\BlackjackApp\BlackjackAppUI\obj\x64\Debug\net6.0-windows\BlackjackAp
 D:\Projects\BlackjackApp\BlackjackAppUI\obj\x64\Debug\net6.0-windows\BlackjackAppUI.WelcomePage.resources
 D:\Projects\BlackjackApp\BlackjackAppUI\obj\x64\Debug\net6.0-windows\BlackjackAppUI.BettingPage.resources
 D:\Projects\BlackjackApp\BlackjackAppUI\obj\x64\Debug\net6.0-windows\BlackjackAppUI.GamePage.resources
+D:\Projects\BlackjackApp\BlackjackAppUI\obj\x64\Debug\net6.0-windows\BlackjackAppUI.Properties.Resources.resources

@@ -34,7 +34,7 @@ namespace BlackjackApp
         }
         public override string ToString()
         {
-            return Rank + " Of " + Suit; 
+            return Rank.ToLower() + "_of_" + Suit+'s'; 
         }
     }
 }
