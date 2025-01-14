@@ -36,6 +36,7 @@ namespace BlackjackAppUI
                 ImageSize = new System.Drawing.Size(70, 100) // Set size of images
             };
 
+            // Add all cards to the imageList
             foreach (Card item in deck.GetListOfCards())
             {
                 imageList.Images.Add(item.ToString(), System.Drawing.Image.FromFile("playing_cards/" + item.ToString() + ".png"));
@@ -49,14 +50,12 @@ namespace BlackjackAppUI
             playerList.View = View.LargeIcon;
             DealerList.View = View.LargeIcon;
 
-            // Add items to the ListView
-
-
             this.player = player;
             this.bet = bet;
 
             player.AddToPocketMoney(-bet);
 
+            // Clear both player and dealer hand
             player.ResetHand();
             dealer.ResetHand();
 
@@ -64,36 +63,17 @@ namespace BlackjackAppUI
             dealerTurnTimer.Interval = 1000; // Set the interval to 1 second (1000ms).
             dealerTurnTimer.Tick += DealerTurnTimer_Tick;
 
-            deck = new DeckOfCards();
             deck.ShuffleDeck();
 
             HitButton.PerformClick();
             HitButton.PerformClick();
 
-            string cardDetails = dealer.DealCard(deck, dealer).ToString();
-            var card = new ListViewItem(cardDetails)
-            {
-                ImageKey = cardDetails
-            };
-            DealerList.Items.Add(card);
-            DealerSumLabel.Text = "Sum = " + dealer.CurrentHand.GetSum().ToString();
-
-            // Dealer Play
-
+            addCardToListView(dealer);
         }
-
-
-
+        
         private void HitButton_Click(object sender, EventArgs e)
         {
-            string cardDetails = dealer.DealCard(deck, player).ToString();
-            var card = new ListViewItem(cardDetails)
-            {
-                ImageKey = cardDetails
-            };
-            playerList.Items.Add(card);
-            PlayerSumLabel.Text = "Sum = " + player.CurrentHand.GetSum().ToString();
-
+            addCardToListView(player);
             if (player.CurrentHand.IsBust())
             {
                 MessageBox.Show("You Lost!");
@@ -105,10 +85,8 @@ namespace BlackjackAppUI
                 StandButton.PerformClick();
             }
         }
-
         private void StandButton_Click(object sender, EventArgs e)
         {
-            //OnPlayerEndTurn.Invoke();
             dealerTurnTimer.Start();
             StandButton.Enabled = false;
             HitButton.Enabled = false;
@@ -124,18 +102,31 @@ namespace BlackjackAppUI
             int choice = dealer.MakeChoice();
             if (choice == 1)
             {
-                string cardDetails = dealer.DealCard(deck, dealer).ToString();
-                var card = new ListViewItem(cardDetails)
-                {
-                    ImageKey = cardDetails
-                };
-                DealerList.Items.Add(card);
-                DealerSumLabel.Text = "Sum = " + dealer.CurrentHand.GetSum().ToString();
+                addCardToListView(dealer);
             }
             else if (choice == 2)
             {
                 dealerTurnTimer.Stop();
                 DetermineWinner();
+            }
+        }
+        private void addCardToListView(Participant participant)
+        {
+            string cardDetails = dealer.DealCard(deck, participant).ToString();
+            var card = new ListViewItem(cardDetails)
+            {
+                ImageKey = cardDetails
+            };
+            if (participant is Dealer)
+            {
+                DealerList.Items.Add(card);
+                DealerSumLabel.Text = "Sum = " + dealer.CurrentHand.GetSum().ToString();
+
+            }
+            else
+            {
+                playerList.Items.Add(card);
+                PlayerSumLabel.Text = "Sum = " + player.CurrentHand.GetSum().ToString();
             }
         }
         private void DetermineWinner()
@@ -145,7 +136,7 @@ namespace BlackjackAppUI
 
             if (DealerScore > 21 || PlayerScore > DealerScore)
             {
-                MessageBox.Show("YOU WIN!");
+                MessageBox.Show("You Won!");
                 player.AddToPocketMoney(bet * 2);
             }
             else if (PlayerScore == DealerScore)
