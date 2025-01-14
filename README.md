@@ -44,6 +44,19 @@ A C# implementation of the classic Blackjack game, featuring a graphical user in
 2. Open the project in Visual Studio.
 3. Build and run the solution.
 
+## Screenshots
+- **Winning a round:**
+
+![Wining](https://github.com/user-attachments/assets/dbc70654-d099-4a19-924d-a57c06eb07cb)
+
+- **Losing a round:**
+
+![Losing](https://github.com/user-attachments/assets/27aafc93-740d-448e-ae19-5fff52af7413)
+
+- **Hitting a blackjack:**
+
+![Blackjack](https://github.com/user-attachments/assets/1c80f4eb-5cdb-4e70-9fb2-c4a4de72b481)
+
 ## Future Enhancements
 - Add animations for card dealing.
 - Improve the UI with custom graphics or themes.
