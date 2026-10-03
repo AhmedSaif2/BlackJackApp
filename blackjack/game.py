@@ -24,7 +24,8 @@ class Round:
     The bet is taken from the player up front. The player is dealt two cards and the
     dealer one; the player then hits or stands, after which the dealer plays one step
     at a time (so a UI can reveal the dealer's cards gradually). When the round ends,
-    winnings are paid out: double the bet on a win, the bet back on a draw.
+    winnings are paid out (double the bet on a win, the bet back on a draw) and the
+    result is recorded in the player's stats.
     """
 
     def __init__(self, player: Player, dealer: Dealer, bet: int, deck: Optional[Deck] = None):
@@ -46,6 +47,7 @@ class Round:
         self._deal(player)
         self._deal(player)
         self._deal(dealer)
+        self.is_blackjack = player.hand.is_twenty_one()
         self._stand_on_twenty_one()
 
     @property
@@ -113,7 +115,15 @@ class Round:
 
     def _finish(self, outcome: Outcome) -> None:
         self.outcome = outcome
+        stats = self.player.stats
         if outcome is Outcome.WIN:
             self.player.add_to_pocket_money(self.bet * 2)
+            stats.record_win(self.bet)
         elif outcome is Outcome.DRAW:
             self.player.add_to_pocket_money(self.bet)
+            stats.record_draw()
+        else:
+            stats.record_loss(self.bet, bust=self.player.hand.is_bust())
+        if self.is_blackjack:
+            stats.record_blackjack()
+        stats.update_pocket_money(self.player.pocket_money)

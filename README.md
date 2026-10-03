@@ -10,6 +10,7 @@ A Python implementation of the classic Blackjack game, with a graphical interfac
   - Players can enter their name and place bets (bets you can't afford are disabled).
   - Real-time updates to the player's and dealer's cards and scores.
   - When you run out of money you can start over.
+- **Scoreboard**: Session stats are tracked for each player: rounds played, wins, losses, draws, win rate, blackjacks, busts, net winnings and the highest pocket money reached. They appear on the betting screen after the first round, and in the console after every round and in the closing summary.
 - **Console Mode**: Play the same game in the terminal with `--cli`.
 
 ## How to Play
@@ -54,6 +55,7 @@ blackjack/
 ├── hand.py          # Hand: totals, flexible aces, bust / 21 checks
 ├── participants.py  # Player (pocket money, bets) and Dealer (deals cards, hit/stand policy)
 ├── game.py          # Round: one hand of blackjack, shared by both front-ends
+├── stats.py         # PlayerStats: the session scoreboard, updated when a round ends
 ├── gui.py           # Tkinter app: welcome, betting and game pages
 ├── cli.py           # Console front-end
 ├── __main__.py      # Entry point (`python -m blackjack [--cli]`)
@@ -89,4 +91,4 @@ tests/               # Unit tests for the game logic, the console and the GUI
 ## Future Enhancements
 - Improve the UI with custom graphics or themes.
 - Implement additional game features like splitting or doubling down.
-- Add a scoreboard to track player stats.
+- Save player stats between sessions and add a leaderboard across players.

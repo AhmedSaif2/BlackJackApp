@@ -1,7 +1,7 @@
 import random
 import unittest
 
-from blackjack import Action, Card, Dealer, Deck, Hand, Outcome, Player, Round, Suit
+from blackjack import Action, Card, Dealer, Deck, Hand, Outcome, Player, PlayerStats, Round, Suit
 
 
 def stacked_deck(*ranks: str) -> Deck:
@@ -211,6 +211,89 @@ class RoundTests(unittest.TestCase):
             self.assertIsNotNone(game.outcome)
             expected = {Outcome.WIN: 110, Outcome.DRAW: 100, Outcome.LOSE: 90}[game.outcome]
             self.assertEqual(player.pocket_money, expected)
+
+
+class StatsTests(unittest.TestCase):
+    def setUp(self):
+        self.player = Player("Ann", 1000)
+        self.dealer = FixedDealer()
+
+    def play(self, bet, *ranks, hits=0):
+        game = Round(self.player, self.dealer, bet, stacked_deck(*ranks))
+        for _ in range(hits):
+            game.hit()
+        if game.is_player_turn:
+            game.stand()
+        game.play_dealer()
+        return game
+
+    def assertStats(self, **expected):
+        stats = self.player.stats
+        self.assertEqual({name: getattr(stats, name) for name in expected}, expected)
+
+    def test_new_player_has_empty_stats(self):
+        self.assertEqual(self.player.stats, PlayerStats(highest_pocket_money=1000))
+        self.assertEqual(self.player.stats.win_rate, 0.0)
+
+    def test_win(self):
+        self.play(50, "10", "9", "10", "7")
+        self.assertStats(rounds_played=1, wins=1, losses=0, draws=0, net_winnings=50, highest_pocket_money=1050)
+
+    def test_draw(self):
+        self.play(50, "10", "8", "10", "8")
+        self.assertStats(rounds_played=1, wins=0, losses=0, draws=1, net_winnings=0, highest_pocket_money=1000)
+
+    def test_lose_on_dealer_total(self):
+        self.play(50, "10", "7", "10", "9")
+        self.assertStats(rounds_played=1, losses=1, busts=0, net_winnings=-50, highest_pocket_money=1000)
+
+    def test_bust(self):
+        self.play(50, "king", "queen", "5", "2", hits=1)
+        self.assertStats(rounds_played=1, losses=1, busts=1, net_winnings=-50)
+
+    def test_blackjack(self):
+        self.play(10, "ace", "king", "10", "10")
+        self.assertStats(rounds_played=1, wins=1, blackjacks=1, net_winnings=10)
+
+    def test_blackjack_counts_even_on_a_draw(self):
+        self.play(10, "ace", "king", "10", "ace")
+        self.assertStats(draws=1, blackjacks=1)
+
+    def test_hitting_to_twenty_one_is_not_a_blackjack(self):
+        self.play(10, "5", "6", "10", "king", "7", hits=1)
+        self.assertStats(wins=1, blackjacks=0)
+
+    def test_stats_accumulate_across_rounds(self):
+        self.play(200, "10", "9", "10", "7")  # win: 1200
+        self.play(50, "10", "8", "10", "8")  # draw: 1200
+        self.play(200, "king", "queen", "5", "2", hits=1)  # bust: 1000
+        self.play(10, "ace", "king", "10", "10")  # blackjack win: 1010
+        self.assertStats(
+            rounds_played=4, wins=2, losses=1, draws=1, blackjacks=1, busts=1,
+            net_winnings=10, highest_pocket_money=1200,
+        )
+        self.assertEqual(self.player.stats.win_rate, 0.5)
+        self.assertEqual(self.player.stats.summary_lines(), [
+            "Rounds: 4 | Wins: 2 | Losses: 1 | Draws: 1 | Win rate: 50%",
+            "Blackjacks: 1 | Busts: 1 | Net: +10$ | Best: 1200$",
+        ])
+
+    def test_random_rounds_keep_stats_consistent(self):
+        rng = random.Random(7)
+        player = Player("Ann", 10_000)
+        for _ in range(300):
+            deck = Deck(rng=rng)
+            deck.shuffle()
+            game = Round(player, Dealer(rng=rng), 10, deck)
+            while game.is_player_turn:
+                game.hit() if rng.random() < 0.5 else game.stand()
+            game.play_dealer()
+        stats = player.stats
+        self.assertEqual(stats.rounds_played, 300)
+        self.assertEqual(stats.wins + stats.losses + stats.draws, 300)
+        self.assertLessEqual(stats.busts, stats.losses)
+        self.assertEqual(stats.net_winnings, player.pocket_money - 10_000)
+        self.assertGreaterEqual(stats.highest_pocket_money, max(player.pocket_money, 10_000))
 
 
 if __name__ == "__main__":

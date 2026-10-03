@@ -8,6 +8,7 @@ from typing import Optional
 
 from .cards import Card, Deck
 from .hand import Hand
+from .stats import PlayerStats
 
 
 class Action(Enum):
@@ -31,6 +32,7 @@ class Player(Participant):
     def __init__(self, name: str, pocket_money: int) -> None:
         super().__init__(name)
         self.pocket_money = pocket_money
+        self.stats = PlayerStats(highest_pocket_money=pocket_money)
 
     def can_afford(self, amount: int) -> bool:
         return 0 < amount <= self.pocket_money

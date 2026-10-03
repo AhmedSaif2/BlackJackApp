@@ -76,6 +76,15 @@ class CliTests(unittest.TestCase):
         self.assertIn("You Won!", output)
         self.assertIn("Draw!", output)
         self.assertIn("You leave with 2550$", output)
+        # The scoreboard after each round, then once more in the closing summary.
+        self.assertEqual(output.count("Rounds: 1 | Wins: 1 | Losses: 0 | Draws: 0 | Win rate: 100%"), 1)
+        self.assertEqual(output.count("Rounds: 2 | Wins: 1 | Losses: 0 | Draws: 1 | Win rate: 50%"), 2)
+        self.assertIn("Blackjacks: 0 | Busts: 0 | Net: +50$ | Best: 2550$", output)
+        self.assertIn("Scoreboard", output)
+
+    def test_no_scoreboard_summary_without_rounds(self):
+        output = self.run_cli("Ann", "q")
+        self.assertNotIn("Scoreboard", output)
 
     def test_blackjack_on_deal(self):
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("ace", "king", "10", "10")):
@@ -178,6 +187,7 @@ class GuiTests(unittest.TestCase):
         self.assertIsInstance(self.page(), gui.BettingPage)
         self.assertIn("Welcome Ann", self.labels())
         self.assertIn("Pocket Money = 2500$", self.labels())
+        self.assertNotIn("Scoreboard", self.labels())
 
     def test_bust_returns_to_betting_page(self):
         self.enter_name()
@@ -251,6 +261,27 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(self.messages, [])
             self.wait_for(lambda: self.messages)
         self.assertEqual(self.messages, ["You Lost!"])
+
+    def test_scoreboard_tracks_rounds_on_betting_page(self):
+        self.enter_name()
+        with mock.patch("blackjack.game.Deck", return_value=stacked_deck("ace", "king", "10", "10")):
+            self.click("10$")
+            self.wait_for(lambda: isinstance(self.page(), gui.BettingPage))
+        with mock.patch("blackjack.game.Deck", return_value=stacked_deck("king", "queen", "2", "5")):
+            self.click("50$")
+            self.wait_for(lambda: self.buttons_enabled(self.page()))
+            self.click("Hit")
+            self.wait_for(lambda: isinstance(self.page(), gui.BettingPage))
+        self.assertIn("Scoreboard", self.labels())
+        self.assertIn("Rounds: 2 | Wins: 1 | Losses: 1 | Draws: 0 | Win rate: 50%", self.labels())
+        self.assertIn("Blackjacks: 1 | Busts: 1 | Net: -40$ | Best: 2510$", self.labels())
+
+    def test_scoreboard_shown_when_out_of_money(self):
+        player = Player("Ann", 5)
+        player.stats.record_loss(200, bust=True)
+        self.app.show_betting_page(player)
+        self.assertIn("You're out of money!", self.labels())
+        self.assertIn("Scoreboard", self.labels())
 
     def test_unaffordable_bets_are_disabled_and_broke_player_can_restart(self):
         self.app.show_betting_page(Player("Ann", 60))
