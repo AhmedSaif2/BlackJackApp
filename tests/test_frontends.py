@@ -120,7 +120,9 @@ class GuiTests(unittest.TestCase):
             self.skipTest(f"No display available: {error}")
         self.app.withdraw()
         self.messages = []
-        patcher = mock.patch.object(gui.messagebox, "showinfo", side_effect=lambda _t, msg: self.messages.append(msg))
+        # The page on screen when each message box appeared.
+        self.pages_at_message = []
+        patcher = mock.patch.object(gui.messagebox, "showinfo", side_effect=self.record_message)
         patcher.start()
         self.addCleanup(patcher.stop)
         # Run the dealer's turn without waiting a second per card.
@@ -130,6 +132,10 @@ class GuiTests(unittest.TestCase):
 
     def tearDown(self):
         self.app.destroy()
+
+    def record_message(self, _title, message):
+        self.messages.append(message)
+        self.pages_at_message.append(type(self.page()))
 
     def page(self):
         return self.app._page
@@ -198,6 +204,8 @@ class GuiTests(unittest.TestCase):
             self.click("10$")
             self.wait_for(lambda: len(self.messages) == 2)
         self.assertEqual(self.messages, ["Blackjack!", "You Won!"])
+        # The player's cards must be on screen when "Blackjack!" pops up.
+        self.assertEqual(self.pages_at_message[0], gui.GamePage)
         self.assertIn("Pocket Money = 2510$", self.labels())
 
     def test_unaffordable_bets_are_disabled_and_broke_player_can_restart(self):

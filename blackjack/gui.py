@@ -118,7 +118,8 @@ class GamePage(tk.Frame):
         self._round = Round(player, Dealer(), bet)
         self._refresh_hands()
         if not self._round.is_player_turn:
-            self._player_reached_twenty_one()
+            # Wait until the page is on screen so the player sees the cards behind the message.
+            self.after_idle(self._player_reached_twenty_one)
 
     def _hand_area(self, title: str):
         header = tk.Frame(self, bg=TABLE_GREEN)
