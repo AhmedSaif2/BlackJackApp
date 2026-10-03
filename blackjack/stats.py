@@ -1,9 +1,9 @@
-"""A player's running stats for the session, shown as a scoreboard by both front-ends."""
+"""A player's running stats, shown as a scoreboard by both front-ends and kept in the save."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List
+from dataclasses import asdict, dataclass, fields
+from typing import Any, Dict, List, Mapping
 
 
 @dataclass
@@ -18,6 +18,14 @@ class PlayerStats:
     # Money won minus money lost, across all rounds.
     net_winnings: int = 0
     highest_pocket_money: int = 0
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "PlayerStats":
+        """Rebuild saved stats, ignoring unknown keys. Raises ValueError/TypeError on bad values."""
+        return cls(**{field.name: int(data[field.name]) for field in fields(cls) if field.name in data})
+
+    def to_dict(self) -> Dict[str, int]:
+        return asdict(self)
 
     @property
     def win_rate(self) -> float:

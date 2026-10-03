@@ -1,4 +1,4 @@
-"""Tkinter front-end: welcome page -> betting page -> game page."""
+"""Tkinter front-end: a single table where you bet, play and see the results."""
 
 from __future__ import annotations
 
@@ -7,12 +7,14 @@ import random
 import tkinter as tk
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
+from tkinter import messagebox
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from .cards import Card, Suit
-from .game import BET_OPTIONS, STARTING_POCKET_MONEY, Outcome, Round
+from .game import BET_OPTIONS, Outcome, Round, new_player
 from .hand import Hand
 from .participants import Dealer, Participant, Player
+from .save import SaveFile
 
 CARD_IMAGES_DIR = Path(__file__).parent / "assets" / "playing_cards"
 # The source images are 500x726; shrinking by 7 gives roughly 72x104 cards on screen.
@@ -35,7 +37,7 @@ BLACKJACK_BANNER_MS = 1300
 CONFETTI_MS = 3000
 CONFETTI_PER_BURST = 70
 
-# Table layout (canvas coordinates; cards are 72x104).
+# Table layout (canvas coordinates; cards are 72x104). A status bar sits below the table.
 TABLE_WIDTH, TABLE_HEIGHT = 792, 530
 TABLE_MARGIN_X = 65
 DEALER_TITLE_Y, DEALER_CARDS_Y = 36, 60
@@ -49,27 +51,29 @@ CARD_OVERLAP_STEP = 24
 DECK_X, DECK_Y = 650, 360
 DECK_DEPTH = 3
 SHADOW_OFFSET = 4
-# Result banners cover the controls row, leaving both hands in view.
+# Banners cover the controls row, leaving both hands in view. Between rounds they hold the bet buttons.
 BANNER_Y = 425
+BANNER_BUTTONS_Y = BANNER_Y + 48
 BANNER_WIDTH, BANNER_HEIGHT = 440, 150
 
 TABLE_GREEN = "#2e8b57"  # SeaGreen, as in the original WinForms app
 SHADOW_COLOR = "#1d5e3a"
 TEXT_COLOR = "#ffffff"
+HINT_COLOR = "#cfe8d9"
 HIGHLIGHT_COLOR = "#ffd54f"
 BUST_COLOR = "#ff8a80"
-ERROR_COLOR = "#ffd54f"
 CARD_BACK_COLOR = "#1f3c88"
 CARD_BACK_ALT = "#2c55b0"
 CARD_BACK_TRIM = "#8fb0f0"
-TITLE_FONT = ("Segoe UI", 36)
 LABEL_FONT = ("Segoe UI", 20)
 BUTTON_FONT = ("Segoe UI", 15)
-SCOREBOARD_FONT = ("Segoe UI", 12)
+SCOREBOARD_FONT = ("Segoe UI", 11)
 BANNER_FONT = ("Segoe UI", 38)
 # Mid-flip card frames are made in steps of this many pixels wide.
 SQUEEZE_STEP = 6
 MAX_SQUEEZED_IMAGES = 150
+
+KEYS_HINT = "Keys: 1 / 2 / 3 bet  ·  Enter same bet  ·  H hit  ·  S stand"
 
 
 class CardImages:
@@ -135,71 +139,13 @@ class CardImages:
         face = self.get(Card("ace", Suit.SPADE))
         return face.width(), face.height()
 
-def _label(parent: tk.Misc, text: str = "", font=LABEL_FONT) -> tk.Label:
-    return tk.Label(parent, text=text, font=font, bg=TABLE_GREEN, fg=TEXT_COLOR)
+
+def _label(parent: tk.Misc, text: str = "", font=LABEL_FONT, fg: str = TEXT_COLOR) -> tk.Label:
+    return tk.Label(parent, text=text, font=font, bg=TABLE_GREEN, fg=fg)
 
 
-def _button(parent: tk.Misc, text: str, command: Callable[[], None]) -> tk.Button:
-    return tk.Button(parent, text=text, font=BUTTON_FONT, width=8, bg="white", command=command)
-
-
-class WelcomePage(tk.Frame):
-    def __init__(self, master: tk.Misc, on_play: Callable[[Player], None]):
-        super().__init__(master, bg=TABLE_GREEN)
-        self._on_play = on_play
-
-        _label(self, "Blackjack", TITLE_FONT).pack(pady=(90, 50))
-        row = tk.Frame(self, bg=TABLE_GREEN)
-        row.pack()
-        _label(row, "Enter Your Name").pack(side=tk.LEFT, padx=(0, 20))
-        self._name = tk.Entry(row, font=LABEL_FONT, width=16)
-        self._name.pack(side=tk.LEFT)
-        self._name.bind("<Return>", lambda _event: self._play())
-        self._name.focus_set()
-        # Shown under the name box instead of a pop-up when the name is missing.
-        self._error = _label(self, "", BUTTON_FONT)
-        self._error.config(fg=ERROR_COLOR)
-        self._error.pack(pady=(14, 0))
-        _button(self, "Play", self._play).pack(pady=(14, 50))
-
-    def _play(self) -> None:
-        name = self._name.get().strip()
-        if not name:
-            self._error.config(text="Please enter your name!")
-            self._name.focus_set()
-            return
-        self._on_play(Player(name, STARTING_POCKET_MONEY))
-
-
-class BettingPage(tk.Frame):
-    def __init__(self, master: tk.Misc, player: Player, on_bet: Callable[[int], None], on_restart: Callable[[], None]):
-        super().__init__(master, bg=TABLE_GREEN)
-
-        _label(self, f"Welcome {player.name}").pack(pady=(90, 30))
-        _label(self, f"Pocket Money = {player.pocket_money}$").pack()
-        if player.stats.rounds_played:
-            self._scoreboard(player).pack(side=tk.BOTTOM, pady=(0, 30))
-
-        if not any(player.can_afford(bet) for bet in BET_OPTIONS):
-            _label(self, "You're out of money!").pack(pady=(50, 30))
-            _button(self, "Start over", on_restart).pack()
-            return
-
-        _label(self, "Place your bet").pack(pady=(50, 30))
-        row = tk.Frame(self, bg=TABLE_GREEN)
-        row.pack()
-        for bet in BET_OPTIONS:
-            button = _button(row, f"{bet}$", lambda bet=bet: on_bet(bet))
-            if not player.can_afford(bet):
-                button.config(state=tk.DISABLED)
-            button.pack(side=tk.LEFT, padx=50)
-
-    def _scoreboard(self, player: Player) -> tk.Frame:
-        board = tk.Frame(self, bg=TABLE_GREEN)
-        _label(board, "Scoreboard", BUTTON_FONT).pack()
-        for line in player.stats.summary_lines():
-            _label(board, line, SCOREBOARD_FONT).pack()
-        return board
+def _button(parent: tk.Misc, text: str, command: Callable[[], None], underline: int = -1) -> tk.Button:
+    return tk.Button(parent, text=text, font=BUTTON_FONT, width=8, bg="white", command=command, underline=underline)
 
 
 # One background thread runs the dealer's decisions, one at a time.
@@ -210,6 +156,7 @@ BANNER_STYLES = {
     "win": ("#f5c518", "#fff3b0", "#3b2a00", "#5c4300"),
     "lose": ("#8b1e2d", "#d9727f", "white", "#f3c9cf"),
     "draw": ("#37474f", "#90a4ae", "white", "#cfd8dc"),
+    "table": ("#226b45", "#7fc8a0", "white", "#cfe8d9"),
 }
 CONFETTI_COLORS = ("#f5c518", "#ff5252", "#40c4ff", "#69f0ae", "#e040fb", "#ffffff", "#ff9100")
 
@@ -231,56 +178,96 @@ def _blend(start: str, end: str, t: float) -> str:
     return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(a, b))
 
 
-class GamePage(tk.Frame):
-    """The table, drawn on a canvas so cards can fly, flip and be celebrated over."""
+class Table(tk.Frame):
+    """The whole game on one screen, drawn on a canvas so cards can fly, flip and be celebrated over.
 
-    def __init__(
-        self,
-        master: tk.Misc,
-        player: Player,
-        bet: int,
-        card_images: CardImages,
-        on_round_over: Callable[[Player], None],
-    ):
+    Between rounds a banner on the table holds the bet buttons (after a round, it also
+    announces the result) and the last hand stays in view. Placing a bet clears the
+    table and deals a new hand. Your chips and stats are saved as you play.
+    """
+
+    def __init__(self, master: tk.Misc, player: Player, save: SaveFile, card_images: CardImages):
         super().__init__(master, bg=TABLE_GREEN)
-        self._player = player
-        self._bet = bet
+        self.player = player
+        self._save = save
         self._card_images = card_images
-        self._on_round_over = on_round_over
-        # Animation callbacks still waiting to run; cancelled if the page closes first.
+        self._round: Optional[Round] = None
+        self._last_bet: Optional[int] = None
+        # True while the bet buttons are on offer in the banner.
+        self._accepting_bets = False
+        # Animation callbacks still waiting to run; cancelled when the table is cleared or closed.
         self._pending: Set[str] = set()
+
+        # Under the table: the scoreboard and a key hint, with your chips and New game on the right.
+        status = tk.Frame(self, bg=TABLE_GREEN)
+        status.pack(side=tk.BOTTOM, fill=tk.X, padx=TABLE_MARGIN_X - 25, pady=(0, 10))
+        right_column = tk.Frame(status, bg=TABLE_GREEN)
+        right_column.pack(side=tk.RIGHT, anchor=tk.S)
+        self._chips_label = _label(right_column, font=BUTTON_FONT)
+        self._chips_label.pack(anchor=tk.E)
+        self.new_game_button = tk.Button(
+            right_column, text="New game", font=SCOREBOARD_FONT, bg="white", command=self._confirm_new_game
+        )
+        self.new_game_button.pack(anchor=tk.E, pady=(4, 0))
+        self.stats_lines = [_label(status, font=SCOREBOARD_FONT, fg=HINT_COLOR) for _ in range(2)]
+        for line in self.stats_lines:
+            line.pack(anchor=tk.W)
+        _label(status, KEYS_HINT, SCOREBOARD_FONT, fg=HINT_COLOR).pack(anchor=tk.W)
 
         # A fixed-size table, kept centred if the window is made bigger.
         self._table = tk.Canvas(self, width=TABLE_WIDTH, height=TABLE_HEIGHT, bg=TABLE_GREEN, highlightthickness=0)
-        self._table.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        self._table.pack(expand=True)
         right = TABLE_WIDTH - TABLE_MARGIN_X
         self._sum_text: Dict[str, int] = {}
         for key, title, title_y in (("dealer", "Dealer Cards", DEALER_TITLE_Y), ("player", "Your Cards", PLAYER_TITLE_Y)):
             self._table.create_text(TABLE_MARGIN_X, title_y, text=title, font=LABEL_FONT, fill=TEXT_COLOR, anchor=tk.W)
             self._sum_text[key] = self._table.create_text(right, title_y, text="", font=LABEL_FONT, fill=TEXT_COLOR, anchor=tk.E)
-        self._table.create_text(BET_X, CONTROLS_Y, text=f"Bet = {bet}$", font=LABEL_FONT, fill=TEXT_COLOR)
+        self._bet_text = self._table.create_text(BET_X, CONTROLS_Y, text="", font=LABEL_FONT, fill=TEXT_COLOR)
 
-        self._hit_button = _button(self._table, "Hit", self._hit)
-        self._stand_button = _button(self._table, "Stand", self._stand)
+        self.hit_button = _button(self._table, "Hit", self._hit, underline=0)
+        self.stand_button = _button(self._table, "Stand", self._stand, underline=0)
         self._controls = [
-            self._table.create_window(TABLE_MARGIN_X + 25, CONTROLS_Y, window=self._hit_button, anchor=tk.W),
-            self._table.create_window(TABLE_MARGIN_X + 145, CONTROLS_Y, window=self._stand_button, anchor=tk.W),
+            self._table.create_window(TABLE_MARGIN_X + 25, CONTROLS_Y, window=self.hit_button, anchor=tk.W),
+            self._table.create_window(TABLE_MARGIN_X + 145, CONTROLS_Y, window=self.stand_button, anchor=tk.W),
         ]
+        self._hide_controls()
 
         # The deck: a few backs stacked with a slight offset, so it reads as a pile.
         for depth in range(DECK_DEPTH, 0, -1):
             self._table.create_image(DECK_X + depth * 2, DECK_Y + depth * 2, image=card_images.back(), anchor=tk.NW)
         self._table.create_image(DECK_X, DECK_Y, image=card_images.back(), anchor=tk.NW)
-
-        self._round = Round(player, Dealer(), bet)
         # Canvas items of the cards that have landed in each hand.
         self._cards: Dict[str, List[int]] = {"dealer": [], "player": []}
-        self._set_buttons_enabled(False)
-        # Wait until the page is on screen, so the first card is seen leaving the deck.
-        self._later(0, self._deal_new_cards, self._after_player_card)
+
+        # What a banner offers between rounds: the bets, or Start over once you're out of chips.
+        self._bet_row = tk.Frame(self._table)
+        self.bet_buttons: Dict[int, tk.Button] = {}
+        for bet in BET_OPTIONS:
+            button = _button(self._bet_row, f"{bet}$", lambda bet=bet: self._deal(bet))
+            button.pack(side=tk.LEFT, padx=8)
+            self.bet_buttons[bet] = button
+        self._start_over_row = tk.Frame(self._table)
+        self.start_over_button = _button(self._start_over_row, "Start over", self._start_new_game)
+        self.start_over_button.pack()
+
+        toplevel = self.winfo_toplevel()
+        for key, button in (("h", self.hit_button), ("s", self.stand_button)):
+            for keysym in (key, key.upper()):
+                toplevel.bind(f"<KeyPress-{keysym}>", lambda _event, button=button: self._press(button))
+        for number, bet in enumerate(BET_OPTIONS, start=1):
+            toplevel.bind(f"<KeyPress-{number}>", lambda _event, bet=bet: self._press(self.bet_buttons[bet]))
+        toplevel.bind("<Return>", lambda _event: self._press_same_bet())
+
+        self._refresh_status()
+        if self._is_broke():
+            self._open_betting("Out of chips", "Start over to play again", "lose")
+        elif player.stats.rounds_played:
+            self._open_betting("Welcome back!", "Place your bet", "table")
+        else:
+            self._open_betting("Blackjack", "Place your bet", "table")
 
     def _later(self, ms: int, callback: Callable[..., None], *args) -> None:
-        """``after``, cancelled if the page is closed first (say, Continue mid-confetti)."""
+        """``after``, cancelled if the table is cleared or closed first (say, a new bet mid-confetti)."""
 
         def run() -> None:
             self._pending.discard(after_id)
@@ -289,10 +276,13 @@ class GamePage(tk.Frame):
         after_id = self.after(ms, run)
         self._pending.add(after_id)
 
-    def destroy(self) -> None:
+    def _cancel_pending(self) -> None:
         for after_id in self._pending:
             self.after_cancel(after_id)
         self._pending.clear()
+
+    def destroy(self) -> None:
+        self._cancel_pending()
         super().destroy()
 
     def _hide_controls(self) -> None:
@@ -303,8 +293,92 @@ class GamePage(tk.Frame):
 
     def _set_buttons_enabled(self, enabled: bool) -> None:
         state = tk.NORMAL if enabled else tk.DISABLED
-        self._hit_button.config(state=state)
-        self._stand_button.config(state=state)
+        self.hit_button.config(state=state)
+        self.stand_button.config(state=state)
+
+    # --- Status and shortcuts -------------------------------------------------------------
+
+    def _is_broke(self) -> bool:
+        return not any(self.player.can_afford(bet) for bet in BET_OPTIONS)
+
+    def _round_in_progress(self) -> bool:
+        return self._round is not None and not self._round.is_over
+
+    def _refresh_status(self) -> None:
+        self._chips_label.config(text=f"Chips: {self.player.pocket_money}$")
+        self.new_game_button.config(state=tk.DISABLED if self._round_in_progress() else tk.NORMAL)
+        stats = self.player.stats
+        lines = stats.summary_lines() if stats.rounds_played else ["No hands played yet", ""]
+        for label, text in zip(self.stats_lines, lines):
+            label.config(text=text)
+
+    def _press(self, button: tk.Button) -> None:
+        """Keyboard shortcut: click ``button`` if it's enabled (bets also need to be on offer)."""
+        if str(button.cget("state")) == tk.NORMAL:
+            button.invoke()
+
+    def _press_same_bet(self) -> None:
+        if self._last_bet is not None:
+            self._press(self.bet_buttons[self._last_bet])
+
+    # --- Between rounds -------------------------------------------------------------------
+
+    def _open_betting(self, title: str, subtitle: str, style: str) -> None:
+        self._show_banner(title, subtitle, style, then=lambda: self._offer_bets(style))
+
+    def _offer_bets(self, style: str) -> None:
+        """Put the bet buttons (or Start over, when you're out of chips) in the banner."""
+        row = self._start_over_row if self._is_broke() else self._bet_row
+        row.config(bg=BANNER_STYLES[style][0])
+        if row is self._bet_row:
+            for bet, button in self.bet_buttons.items():
+                button.config(state=tk.NORMAL if self.player.can_afford(bet) else tk.DISABLED)
+            self._accepting_bets = True
+        self._table.create_window(TABLE_WIDTH / 2, BANNER_BUTTONS_Y, window=row, tags=("banner", "round"))
+
+    def _clear_table(self) -> None:
+        """Sweep the last hand, its banner and any animation still running off the table."""
+        self._cancel_pending()
+        self._accepting_bets = False
+        self._table.delete("round")
+        self._cards = {"dealer": [], "player": []}
+        for item in self._sum_text.values():
+            self._table.itemconfigure(item, text="", fill=TEXT_COLOR)
+        self._table.itemconfigure(self._bet_text, text="")
+
+    def _confirm_new_game(self) -> None:
+        if self._round_in_progress():
+            return
+        if messagebox.askyesno("Blackjack", "Start a new game? Your chips and stats will be reset."):
+            self._start_new_game()
+
+    def _start_new_game(self) -> None:
+        self.player = new_player()
+        self._round = None
+        self._last_bet = None
+        self._save.save(self.player)
+        self._clear_table()
+        self._hide_controls()
+        self._refresh_status()
+        self._open_betting("New game", "Place your bet", "table")
+
+    # --- Playing a round ------------------------------------------------------------------
+
+    def _deal(self, bet: int) -> None:
+        if not self._accepting_bets or not self.player.can_afford(bet):
+            return
+        self._clear_table()
+        self._last_bet = bet
+        self._round = Round(self.player, Dealer(), bet)
+        # Save once the bet is down, so closing the window mid-hand doesn't undo a losing hand.
+        self._save.save(self.player)
+        self._table.itemconfigure(self._bet_text, text=f"Bet = {bet}$")
+        for control in self._controls:
+            self._table.itemconfigure(control, state=tk.NORMAL)
+        self._set_buttons_enabled(False)
+        self._refresh_status()
+        # Wait until the table is drawn, so the first card is seen leaving the deck.
+        self._later(0, self._deal_new_cards, self._after_player_card)
 
     # --- Dealing ---------------------------------------------------------------------------
 
@@ -313,7 +387,7 @@ class GamePage(tk.Frame):
 
         The player's cards go first, the same order ``Round`` deals the opening hand in.
         """
-        for key, participant in (("player", self._player), ("dealer", self._round.dealer)):
+        for key, participant in (("player", self.player), ("dealer", self._round.dealer)):
             if len(self._cards[key]) < len(participant.hand):
                 self._deal_card(key, participant, then=lambda: self._deal_new_cards(then))
                 return
@@ -333,8 +407,8 @@ class GamePage(tk.Frame):
         card = dealt[-1]
         width, height = self._card_images.size()
         end_x, end_y = self._card_position(key, index)
-        shadow = self._table.create_rectangle(0, 0, 0, 0, fill=SHADOW_COLOR, outline="", tags=("flying",))
-        flyer = self._table.create_image(DECK_X, DECK_Y, image=self._card_images.back(), anchor=tk.NW, tags=("flying",))
+        shadow = self._table.create_rectangle(0, 0, 0, 0, fill=SHADOW_COLOR, outline="", tags=("flying", "round"))
+        flyer = self._table.create_image(DECK_X, DECK_Y, image=self._card_images.back(), anchor=tk.NW, tags=("flying", "round"))
         steps = max(1, DEAL_ANIMATION_MS // ANIMATION_FRAME_MS)
 
         def frame(step: int) -> None:
@@ -369,8 +443,11 @@ class GamePage(tk.Frame):
                 end_y + height + SHADOW_OFFSET,
                 fill=SHADOW_COLOR,
                 outline="",
+                tags=("round",),
             )
-            self._cards[key].append(self._table.create_image(end_x, end_y, image=self._card_images.get(card), anchor=tk.NW))
+            self._cards[key].append(
+                self._table.create_image(end_x, end_y, image=self._card_images.get(card), anchor=tk.NW, tags=("round",))
+            )
             # Only count the card once it's on the table.
             hand = Hand()
             for dealt_card in dealt:
@@ -396,6 +473,7 @@ class GamePage(tk.Frame):
     # --- Turns -----------------------------------------------------------------------------
 
     def _after_player_card(self) -> None:
+        assert self._round is not None
         if self._round.is_over:
             self._end_round()
         elif self._round.is_player_turn:
@@ -404,19 +482,24 @@ class GamePage(tk.Frame):
             self._player_reached_twenty_one()
 
     def _hit(self) -> None:
+        assert self._round is not None
         self._set_buttons_enabled(False)
         self._round.hit()
         self._deal_new_cards(then=self._after_player_card)
 
     def _stand(self) -> None:
+        assert self._round is not None
         self._round.stand()
         self._start_dealer_turn()
 
     def _player_reached_twenty_one(self) -> None:
+        assert self._round is not None
         self._hide_controls()
         self._burst_confetti()
+        # Only 21 on the first two cards is a blackjack.
+        title = "Blackjack!" if self._round.is_blackjack else "21!"
         self._show_banner(
-            "Blackjack!", "Dealer's turn...", "win", then=self._start_dealer_turn, hide_after_ms=BLACKJACK_BANNER_MS
+            title, "Dealer's turn...", "win", then=self._start_dealer_turn, hide_after_ms=BLACKJACK_BANNER_MS
         )
 
     def _start_dealer_turn(self) -> None:
@@ -424,6 +507,7 @@ class GamePage(tk.Frame):
         self._later(DEALER_TURN_DELAY_MS, self._dealer_step)
 
     def _dealer_step(self) -> None:
+        assert self._round is not None
         # The dealer asks Jev over the network, so decide off the Tk thread to keep the window responsive.
         self._wait_for_dealer(_dealer_worker.submit(self._round.dealer_step))
 
@@ -437,17 +521,21 @@ class GamePage(tk.Frame):
             self._deal_new_cards(then=lambda: self._later(DEALER_TURN_DELAY_MS, self._dealer_step))
 
     def _end_round(self) -> None:
-        outcome: Optional[Outcome] = self._round.outcome
-        assert outcome is not None
+        assert self._round is not None and self._round.outcome is not None
+        outcome, bet = self._round.outcome, self._round.bet
+        self._save.save(self.player)
         self._hide_controls()
+        self._table.itemconfigure(self._bet_text, text="")
+        self._refresh_status()
+        out_of_chips = "  ·  Out of chips" if self._is_broke() else ""
         if outcome is Outcome.WIN:
             self._fire_confetti_cannons()
-            self._show_banner(outcome.value, f"+{self._bet}$", "win", then=self._show_continue_button)
+            self._open_betting(outcome.value, f"+{bet}$", "win")
         elif outcome is Outcome.LOSE:
-            reason = "Bust! " if self._player.hand.is_bust() else ""
-            self._show_banner(outcome.value, f"{reason}-{self._bet}$", "lose", then=self._show_continue_button)
+            reason = "Bust! " if self.player.hand.is_bust() else ""
+            self._open_betting(outcome.value, f"{reason}-{bet}${out_of_chips}", "lose")
         else:
-            self._show_banner(outcome.value, f"Your {self._bet}$ bet is returned", "draw", then=self._show_continue_button)
+            self._open_betting(outcome.value, f"Your {bet}$ bet is returned", "draw")
 
     # --- Banners and celebrations ----------------------------------------------------------
 
@@ -466,9 +554,9 @@ class GamePage(tk.Frame):
         """
         fill, outline, title_color, subtitle_color = BANNER_STYLES[style]
         cx, cy = TABLE_WIDTH / 2, BANNER_Y
-        panel = self._table.create_rectangle(0, 0, 0, 0, fill=fill, outline=outline, width=4, tags=("banner",))
-        title_item = self._table.create_text(cx, cy, text=title, fill=title_color, tags=("banner", "banner_title"))
-        subtitle_item = self._table.create_text(cx, cy, text=subtitle, fill=subtitle_color, tags=("banner",))
+        panel = self._table.create_rectangle(0, 0, 0, 0, fill=fill, outline=outline, width=4, tags=("banner", "round"))
+        title_item = self._table.create_text(cx, cy, text=title, fill=title_color, tags=("banner", "banner_title", "round"))
+        subtitle_item = self._table.create_text(cx, cy, text=subtitle, fill=subtitle_color, tags=("banner", "round"))
         steps = max(1, BANNER_INTRO_MS // ANIMATION_FRAME_MS)
         drops_in = style == "lose"
 
@@ -503,12 +591,6 @@ class GamePage(tk.Frame):
         self._table.tag_raise("banner")
         intro(0)
 
-    def _show_continue_button(self) -> None:
-        button = _button(self._table, "Continue", lambda: self._on_round_over(self._player))
-        button.bind("<Return>", lambda _event: button.invoke())
-        self._table.create_window(TABLE_WIDTH / 2, BANNER_Y + 48, window=button, tags=("banner",))
-        button.focus_set()
-
     def _fire_confetti_cannons(self) -> None:
         """Shoot confetti up and inwards from both bottom corners."""
         launches = []
@@ -532,7 +614,7 @@ class GamePage(tk.Frame):
         pieces = []
         for x, y, vx, vy in launches:
             item = self._table.create_polygon(
-                0, 0, 0, 0, 0, 0, fill=random.choice(CONFETTI_COLORS), outline="", tags=("confetti",)
+                0, 0, 0, 0, 0, 0, fill=random.choice(CONFETTI_COLORS), outline="", tags=("confetti", "round")
             )
             pieces.append([item, x, y, vx, vy, random.uniform(0, math.pi), random.uniform(-0.3, 0.3), random.uniform(4, 7)])
         steps = max(1, CONFETTI_MS // ANIMATION_FRAME_MS)
@@ -561,41 +643,19 @@ class GamePage(tk.Frame):
 
 
 class BlackjackApp(tk.Tk):
-    def __init__(self) -> None:
+    def __init__(self, save: Optional[SaveFile] = None) -> None:
         super().__init__()
         self.title("Blackjack")
-        self.geometry("792x530")
-        self.minsize(792, 530)
+        self.geometry("792x600")
+        self.minsize(792, 600)
         self.configure(bg=TABLE_GREEN)
-        self._card_images = CardImages()
-        self._page: Optional[tk.Frame] = None
+        save = save if save is not None else SaveFile()
 
         icon = tk.PhotoImage(file=str(CARD_IMAGES_DIR / "ace_of_spades.png")).subsample(14)
         self.iconphoto(True, icon)
 
-        self.show_welcome_page()
-
-    def _show(self, page: tk.Frame) -> None:
-        if self._page is not None:
-            self._page.destroy()
-        self._page = page
-        page.pack(fill=tk.BOTH, expand=True)
-
-    def show_welcome_page(self) -> None:
-        self._show(WelcomePage(self, on_play=self.show_betting_page))
-
-    def show_betting_page(self, player: Player) -> None:
-        self._show(
-            BettingPage(
-                self,
-                player,
-                on_bet=lambda bet: self.show_game_page(player, bet),
-                on_restart=self.show_welcome_page,
-            )
-        )
-
-    def show_game_page(self, player: Player, bet: int) -> None:
-        self._show(GamePage(self, player, bet, self._card_images, on_round_over=self.show_betting_page))
+        self.table = Table(self, save.load(), save, CardImages())
+        self.table.pack(fill=tk.BOTH, expand=True)
 
 
 def main() -> None:
