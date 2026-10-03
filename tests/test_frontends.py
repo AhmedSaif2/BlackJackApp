@@ -140,27 +140,31 @@ class GuiTests(unittest.TestCase):
         except tk.TclError as error:
             self.skipTest(f"No display available: {error}")
         self.app.withdraw()
+        # Every banner shown (title, subtitle), and the page on screen when it appeared.
         self.messages = []
-        # The page on screen when each message box appeared.
+        self.subtitles = []
         self.pages_at_message = []
-        patcher = mock.patch.object(gui.messagebox, "showinfo", side_effect=self.record_message)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        # Run the dealer's turn without waiting a second per card.
-        delay = mock.patch.object(gui, "DEALER_TURN_DELAY_MS", 1)
-        delay.start()
-        self.addCleanup(delay.stop)
-        # Likewise, deal cards without the slide-in animation's full duration.
-        animation = mock.patch.object(gui, "DEAL_ANIMATION_MS", 1)
-        animation.start()
-        self.addCleanup(animation.stop)
+        show_banner = gui.GamePage._show_banner
+
+        def record_banner(page, title, subtitle, *args, **kwargs):
+            self.messages.append(title)
+            self.subtitles.append(subtitle)
+            self.pages_at_message.append(type(self.page()))
+            return show_banner(page, title, subtitle, *args, **kwargs)
+
+        # Run the round without waiting for the animations' full durations.
+        for patcher in (
+            mock.patch.object(gui.GamePage, "_show_banner", autospec=True, side_effect=record_banner),
+            mock.patch.object(gui, "DEALER_TURN_DELAY_MS", 1),
+            mock.patch.object(gui, "DEAL_ANIMATION_MS", 1),
+            mock.patch.object(gui, "BANNER_INTRO_MS", 1),
+            mock.patch.object(gui, "BLACKJACK_BANNER_MS", 1),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def tearDown(self):
         self.app.destroy()
-
-    def record_message(self, _title, message):
-        self.messages.append(message)
-        self.pages_at_message.append(type(self.page()))
 
     def page(self):
         return self.app._page
@@ -173,6 +177,9 @@ class GuiTests(unittest.TestCase):
     def labels(self):
         return [label.cget("text") for label in find(self.page(), tk.Label)]
 
+    def sum_text(self, page, hand):
+        return page._table.itemcget(page._sum_text[hand], "text")
+
     def wait_for(self, condition, timeout_ms=3000):
         for _ in range(timeout_ms // 10):
             self.app.update()
@@ -184,14 +191,22 @@ class GuiTests(unittest.TestCase):
     def buttons_enabled(self, page):
         return {str(button.cget("state")) for button in find(page, tk.Button)} == {tk.NORMAL}
 
+    def continue_to_betting_page(self):
+        """Wait for the result banner's Continue button and click it."""
+        self.wait_for(lambda: find(self.page(), tk.Button, "Continue"))
+        self.assertIsInstance(self.page(), gui.GamePage)
+        self.click("Continue")
+        self.assertIsInstance(self.page(), gui.BettingPage)
+
     def enter_name(self, name="Ann"):
         (entry,) = find(self.page(), tk.Entry)
         entry.insert(0, name)
         self.click("Play")
 
     def test_welcome_requires_name(self):
+        self.assertNotIn("Please enter your name!", self.labels())
         self.click("Play")
-        self.assertEqual(self.messages, ["Please enter your name!"])
+        self.assertIn("Please enter your name!", self.labels())
         self.assertIsInstance(self.page(), gui.WelcomePage)
 
     def test_betting_page_shows_player(self):
@@ -201,34 +216,55 @@ class GuiTests(unittest.TestCase):
         self.assertIn("Pocket Money = 2500$", self.labels())
         self.assertNotIn("Scoreboard", self.labels())
 
-    def test_bust_returns_to_betting_page(self):
+    def test_bust_shows_loss_banner_then_returns_to_betting_page(self):
         self.enter_name()
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("king", "queen", "2", "5")):
             self.click("50$")
-            self.wait_for(lambda: self.buttons_enabled(self.page()))
-        self.assertIsInstance(self.page(), gui.GamePage)
-        self.assertIn("Sum = 20", self.labels())
-        self.assertEqual(len(find(self.page()._player_cards, tk.Label)), 2)
+            page = self.page()
+            self.wait_for(lambda: self.buttons_enabled(page))
+        self.assertEqual(self.sum_text(page, "player"), "Sum = 20")
+        self.assertEqual(len(page._cards["player"]), 2)
         self.click("Hit")
         self.wait_for(lambda: self.messages)
         self.assertEqual(self.messages, ["You Lost!"])
-        self.assertIsInstance(self.page(), gui.BettingPage)
+        self.assertEqual(self.subtitles, ["Bust! -50$"])
+        # No celebration for a loss, and the result stays on the table until the player moves on.
+        self.assertEqual(page._table.find_withtag("confetti"), ())
+        self.continue_to_betting_page()
         self.assertIn("Pocket Money = 2450$", self.labels())
 
-    def test_stand_plays_dealer_turn_and_pays_out(self):
+    def test_win_celebrates_with_confetti(self):
         self.enter_name()
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("10", "9", "10", "6", "king")), dealer_hits_below_17():
             self.click("200$")
-            game_page = self.page()
-            self.wait_for(lambda: self.buttons_enabled(game_page))
+            page = self.page()
+            self.wait_for(lambda: self.buttons_enabled(page))
             self.click("Stand")
-            hit, stand = find(game_page, tk.Button, "Hit")[0], find(game_page, tk.Button, "Stand")[0]
+            hit, stand = find(page, tk.Button, "Hit")[0], find(page, tk.Button, "Stand")[0]
             self.assertEqual(str(hit.cget("state")), tk.DISABLED)
             self.assertEqual(str(stand.cget("state")), tk.DISABLED)
             self.wait_for(lambda: self.messages)
         self.assertEqual(self.messages, ["You Won!"])
-        self.assertIsInstance(self.page(), gui.BettingPage)
+        self.assertEqual(self.subtitles, ["+200$"])
+        self.assertNotEqual(page._table.find_withtag("confetti"), ())
+        # Hit and Stand are cleared away so the banner has the row to itself.
+        self.assertEqual(page._table.itemcget(page._controls[0], "state"), tk.HIDDEN)
+        self.continue_to_betting_page()
         self.assertIn("Pocket Money = 2700$", self.labels())
+
+    def test_draw_returns_the_bet(self):
+        self.enter_name()
+        with mock.patch("blackjack.game.Deck", return_value=stacked_deck("10", "8", "10", "8")), dealer_hits_below_17():
+            self.click("50$")
+            page = self.page()
+            self.wait_for(lambda: self.buttons_enabled(page))
+            self.click("Stand")
+            self.wait_for(lambda: self.messages)
+        self.assertEqual(self.messages, ["Draw!"])
+        self.assertEqual(self.subtitles, ["Your 50$ bet is returned"])
+        self.assertEqual(page._table.find_withtag("confetti"), ())
+        self.continue_to_betting_page()
+        self.assertIn("Pocket Money = 2500$", self.labels())
 
     def test_blackjack_on_deal_skips_to_dealer(self):
         self.enter_name()
@@ -236,54 +272,65 @@ class GuiTests(unittest.TestCase):
             self.click("10$")
             self.wait_for(lambda: len(self.messages) == 2)
         self.assertEqual(self.messages, ["Blackjack!", "You Won!"])
-        # The player's cards must be on screen when "Blackjack!" pops up.
+        # The player's cards must be on the table when "Blackjack!" pops up.
         self.assertEqual(self.pages_at_message[0], gui.GamePage)
+        self.continue_to_betting_page()
         self.assertIn("Pocket Money = 2510$", self.labels())
 
-    def test_cards_slide_in_one_at_a_time(self):
+    def test_cards_fly_in_one_at_a_time(self):
         self.enter_name()
         with mock.patch.object(gui, "DEAL_ANIMATION_MS", 150), mock.patch(
             "blackjack.game.Deck", return_value=stacked_deck("king", "queen", "2", "5")
         ):
             self.click("50$")
             page = self.page()
-            player_cards, player_sum = page._player_cards, page._player_sum
             hit, stand = find(page, tk.Button, "Hit")[0], find(page, tk.Button, "Stand")[0]
 
-            # Mid-flight: one card is moving, the hand's sum doesn't count it yet and the buttons are locked.
-            self.wait_for(lambda: len(find(player_cards, tk.Label)) == 1)
-            flyers = [w for w in page.winfo_children() if isinstance(w, tk.Label) and w.winfo_manager() == "place"]
-            self.assertEqual(len(flyers), 2)  # the deck and the card in flight
-            self.assertEqual(player_sum.cget("text"), "")
+            # Mid-flight: one card (and its shadow) is moving, the hand's sum doesn't count it yet
+            # and the buttons are locked.
+            self.wait_for(lambda: page._table.find_withtag("flying"))
+            self.assertEqual(len(page._table.find_withtag("flying")), 2)
+            self.assertEqual(page._cards["player"], [])
+            self.assertEqual(self.sum_text(page, "player"), "")
             self.assertEqual(str(hit.cget("state")), tk.DISABLED)
             self.assertEqual(str(stand.cget("state")), tk.DISABLED)
 
             # The sum follows the cards as they land.
-            self.wait_for(lambda: player_sum.cget("text") == "Sum = 10")
-            self.wait_for(lambda: player_sum.cget("text") == "Sum = 20")
-            self.assertEqual(page._dealer_sum.cget("text"), "")
+            self.wait_for(lambda: self.sum_text(page, "player") == "Sum = 10")
+            self.wait_for(lambda: self.sum_text(page, "player") == "Sum = 20")
+            self.assertEqual(self.sum_text(page, "dealer"), "")
             self.wait_for(lambda: self.buttons_enabled(page))
-            self.assertEqual(page._dealer_sum.cget("text"), "Sum = 2")
+            self.assertEqual(self.sum_text(page, "dealer"), "Sum = 2")
+            self.assertEqual(page._table.find_withtag("flying"), ())
 
-            # Only the deck is left placed on the table, and the hit is animated too.
-            placed = [w for w in page.winfo_children() if w.winfo_manager() == "place"]
-            self.assertEqual(placed, [page._deck])
+            # The hit is animated too, and the result waits until the card has landed.
             self.click("Hit")
             self.assertEqual(str(stand.cget("state")), tk.DISABLED)
             self.assertEqual(self.messages, [])
             self.wait_for(lambda: self.messages)
         self.assertEqual(self.messages, ["You Lost!"])
+        self.assertEqual(len(page._cards["player"]), 3)
+
+    def test_flip_frames_squeeze_the_card(self):
+        images = gui.CardImages()
+        card = Card("ace", Suit.SPADE)
+        self.assertIs(images.squeezed(card, 72), images.get(card))
+        edge_on = images.squeezed(None, 1)
+        self.assertEqual((edge_on.width(), edge_on.height()), (2, 104))
+        half = images.squeezed(card, 36)
+        self.assertEqual((half.width(), half.height()), (36, 104))
+        self.assertIs(images.squeezed(card, 37), half)
 
     def test_scoreboard_tracks_rounds_on_betting_page(self):
         self.enter_name()
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("ace", "king", "10", "10")):
             self.click("10$")
-            self.wait_for(lambda: isinstance(self.page(), gui.BettingPage))
+            self.continue_to_betting_page()
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("king", "queen", "2", "5")):
             self.click("50$")
             self.wait_for(lambda: self.buttons_enabled(self.page()))
             self.click("Hit")
-            self.wait_for(lambda: isinstance(self.page(), gui.BettingPage))
+            self.continue_to_betting_page()
         self.assertIn("Scoreboard", self.labels())
         self.assertIn("Rounds: 2 | Wins: 1 | Losses: 1 | Draws: 0 | Win rate: 50%", self.labels())
         self.assertIn("Blackjacks: 1 | Busts: 1 | Net: -40$ | Best: 2510$", self.labels())

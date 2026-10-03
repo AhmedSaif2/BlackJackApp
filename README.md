@@ -3,7 +3,7 @@
 A Python implementation of the classic Blackjack game, with a graphical interface built on Tkinter and a console mode. The game logic is kept separate from both front-ends, and the project has no third-party dependencies.
 
 ## Features
-- **User-Friendly Interface**: A simple and intuitive GUI for playing Blackjack, with real playing-card images that slide in from the deck and flip face up as they are dealt.
+- **User-Friendly Interface**: A simple and intuitive GUI for playing Blackjack, with real playing-card images that arc out of the deck, casting a shadow, and turn face up as they are dealt.
 - **AI Dealer**: The computer player's hit/stand decisions are made by [Jev](https://www.datacamp.com/blog/system-one-models-jev), with a built-in rule-based fallback.
 - **Flexible Ace Handling**: Ace values adapt dynamically to provide the best possible hand.
 - **Interactive Gameplay**:
@@ -20,7 +20,7 @@ A Python implementation of the classic Blackjack game, with a graphical interfac
    - Click "Hit" to draw another card.
    - Click "Stand" to pass the turn to the dealer.
 4. The dealer plays its hand (decided by Jev), revealing its cards one by one.
-5. See the results and play again! A win pays double your bet, a draw returns it.
+5. See the result on the table (wins are celebrated with confetti), then click "Continue" to play again. A win pays double your bet, a draw returns it.
 
 ## Requirements
 - Python 3.9 or newer, with Tkinter (included with the standard Python installers for Windows and macOS; on Debian/Ubuntu install `python3-tk`).
@@ -82,6 +82,7 @@ tests/               # Unit tests for the game logic, the console and the GUI
 - **UI-independent game logic**: `Round` steps through a hand (`hit`, `stand`, `dealer_step`) without any I/O, so the GUI and console share exactly the same rules.
 - **Page Navigation**: Each screen is a Tkinter frame; the app swaps pages through callbacks.
 - **Dynamic Gameplay**: Dealer's cards are revealed one by one to enhance realism.
+- **In-game results**: The table is a single Tkinter canvas, so results appear as animated banners over it instead of pop-up windows: a confetti burst for a win or blackjack, a drop-in banner for a loss.
 
 ## Technologies Used
 - **Programming Language**: Python
