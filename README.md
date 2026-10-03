@@ -3,7 +3,7 @@
 A Python implementation of the classic Blackjack game, with a graphical interface built on Tkinter and a console mode. The game logic is kept separate from both front-ends, and the project has no third-party dependencies.
 
 ## Features
-- **User-Friendly Interface**: A simple and intuitive GUI for playing Blackjack, with real playing-card images.
+- **User-Friendly Interface**: A simple and intuitive GUI for playing Blackjack, with real playing-card images that slide in from the deck and flip face up as they are dealt.
 - **Dynamic Dealer Logic**: Dealer actions (hit or stand) are fully automated based on game rules.
 - **Flexible Ace Handling**: Ace values adapt dynamically to provide the best possible hand.
 - **Interactive Gameplay**:
@@ -89,7 +89,6 @@ tests/               # Unit tests for the game logic, the console and the GUI
 > These screenshots are from the original Windows Forms version; the Python GUI keeps the same screens and layout.
 
 ## Future Enhancements
-- Add animations for card dealing.
 - Improve the UI with custom graphics or themes.
 - Implement additional game features like splitting or doubling down.
 - Save player stats between sessions and add a leaderboard across players.
