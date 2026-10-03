@@ -6,6 +6,18 @@ from unittest import mock
 
 from blackjack import Action, Card, Dealer, Deck, Player, Suit, cli, gui
 from blackjack.__main__ import main as entry_point
+from tests import without_jev
+
+
+_no_jev = without_jev()
+
+
+def setUpModule():
+    _no_jev.start()
+
+
+def tearDownModule():
+    _no_jev.stop()
 
 
 class StackedDeck(Deck):
@@ -22,7 +34,7 @@ stacked_deck = StackedDeck
 
 
 def dealer_hits_below_17():
-    return mock.patch.object(Dealer, "choose_action", new=lambda self: Action.HIT if self.hand.total < 17 else Action.STAND)
+    return mock.patch.object(Dealer, "choose_action", new=lambda self, opponent_total=None: Action.HIT if self.hand.total < 17 else Action.STAND)
 
 
 def scripted(answers, prompts):

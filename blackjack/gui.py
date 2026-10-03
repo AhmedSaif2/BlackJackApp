@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from tkinter import messagebox
 from typing import Callable, Dict, List, Optional, Tuple
@@ -19,6 +20,8 @@ DEALER_TURN_DELAY_MS = 1000
 # A dealt card slides from the deck to its place in the hand, flipping face up on the way.
 DEAL_ANIMATION_MS = 400
 DEAL_ANIMATION_FRAME_MS = 15
+# How often to check whether the dealer (Jev) has made its decision.
+DEALER_POLL_MS = 50
 
 TABLE_GREEN = "#2e8b57"  # SeaGreen, as in the original WinForms app
 TEXT_COLOR = "white"
@@ -126,6 +129,10 @@ class BettingPage(tk.Frame):
         for line in player.stats.summary_lines():
             _label(board, line, SCOREBOARD_FONT).pack()
         return board
+
+
+# One background thread runs the dealer's decisions, one at a time.
+_dealer_worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dealer")
 
 
 class GamePage(tk.Frame):
@@ -269,7 +276,16 @@ class GamePage(tk.Frame):
         self.after(DEALER_TURN_DELAY_MS, self._dealer_step)
 
     def _dealer_step(self) -> None:
-        if self._round.dealer_step() is None:
+        # The dealer asks Jev over the network, so decide off the Tk thread to keep the window responsive.
+        self._wait_for_dealer(_dealer_worker.submit(self._round.dealer_step))
+
+    def _wait_for_dealer(self, decision: Future[Optional[Card]]) -> None:
+        if not decision.done():
+            self.after(DEALER_POLL_MS, self._wait_for_dealer, decision)
+            return
+        if not self.winfo_exists():
+            return
+        if decision.result() is None:
             self._end_round()
         else:
             self._deal_new_cards(then=lambda: self.after(DEALER_TURN_DELAY_MS, self._dealer_step))

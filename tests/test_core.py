@@ -1,7 +1,20 @@
 import random
 import unittest
+from typing import Optional
 
 from blackjack import Action, Card, Dealer, Deck, Hand, Outcome, Player, PlayerStats, Round, Suit
+from tests import without_jev
+
+
+_no_jev = without_jev()
+
+
+def setUpModule():
+    _no_jev.start()
+
+
+def tearDownModule():
+    _no_jev.stop()
 
 
 def stacked_deck(*ranks: str) -> Deck:
@@ -16,7 +29,7 @@ class FixedDealer(Dealer):
         super().__init__()
         self.stand_at = stand_at
 
-    def choose_action(self) -> Action:
+    def choose_action(self, opponent_total: Optional[int] = None) -> Action:
         return Action.HIT if self.hand.total < self.stand_at else Action.STAND
 
 

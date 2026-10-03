@@ -4,7 +4,7 @@ A Python implementation of the classic Blackjack game, with a graphical interfac
 
 ## Features
 - **User-Friendly Interface**: A simple and intuitive GUI for playing Blackjack, with real playing-card images that slide in from the deck and flip face up as they are dealt.
-- **Dynamic Dealer Logic**: Dealer actions (hit or stand) are fully automated based on game rules.
+- **AI Dealer**: The computer player's hit/stand decisions are made by [Jev](https://www.datacamp.com/blog/system-one-models-jev), with a built-in rule-based fallback.
 - **Flexible Ace Handling**: Ace values adapt dynamically to provide the best possible hand.
 - **Interactive Gameplay**:
   - Players can enter their name and place bets (bets you can't afford are disabled).
@@ -19,7 +19,7 @@ A Python implementation of the classic Blackjack game, with a graphical interfac
 3. Play your hand:
    - Click "Hit" to draw another card.
    - Click "Stand" to pass the turn to the dealer.
-4. The dealer plays its hand based on predefined rules, revealing its cards one by one.
+4. The dealer plays its hand (decided by Jev), revealing its cards one by one.
 5. See the results and play again! A win pays double your bet, a draw returns it.
 
 ## Requirements
@@ -42,6 +42,19 @@ A Python implementation of the classic Blackjack game, with a graphical interfac
    blackjack
    ```
 
+## Computer Player (Jev)
+The dealer is driven by Jev, TypeSafe AI's System One model. On every turn the dealer sends Jev its cards, its total and the player's final total as a `choice` question (`hit` / `stand`) and plays whatever Jev picks.
+
+Configure it with environment variables before starting the game:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `JEV_API_KEY` (or `TYPESAFE_API_KEY`) | — | API key. If it is not set, Jev is disabled |
+| `JEV_API_URL` | `https://api.typesafe.ai/v1/systemone` | Endpoint (point this at a proxy such as OmniaKey if needed) |
+| `JEV_MODEL` | `jev-latest` | Model id |
+
+If Jev isn't configured, doesn't answer within 3 seconds, or returns something unexpected, the dealer falls back to its built-in rules: always hit at 14 or less, always stand at 19 or more, and flip a coin in between. In the GUI the request runs on a background thread, so the window stays responsive while Jev decides. The tests never call the real API.
+
 ## Running the Tests
 ```bash
 python -m unittest discover
@@ -53,7 +66,8 @@ The GUI tests drive the real Tkinter widgets and are skipped automatically when 
 blackjack/
 ├── cards.py         # Suit, Card and Deck
 ├── hand.py          # Hand: totals, flexible aces, bust / 21 checks
-├── participants.py  # Player (pocket money, bets) and Dealer (deals cards, hit/stand policy)
+├── participants.py  # Player (pocket money, bets) and Dealer (deals cards, asks Jev to hit/stand)
+├── jev.py           # Client for the Jev API (standard library only)
 ├── game.py          # Round: one hand of blackjack, shared by both front-ends
 ├── stats.py         # PlayerStats: the session scoreboard, updated when a round ends
 ├── gui.py           # Tkinter app: welcome, betting and game pages

@@ -84,7 +84,7 @@ class Round:
         if self.is_over:
             return None
         hand = self.dealer.hand
-        if hand.is_twenty_one() or hand.is_bust() or self.dealer.choose_action() is Action.STAND:
+        if hand.is_twenty_one() or hand.is_bust() or self.dealer.choose_action(self.player.hand.total) is Action.STAND:
             self._settle()
             return None
         return self._deal(self.dealer)

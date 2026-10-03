@@ -28,6 +28,10 @@ class Hand:
     def total(self) -> int:
         return self._total
 
+    def is_soft(self) -> bool:
+        """True while an ace is being counted as 11."""
+        return self._soft_aces > 0
+
     def is_twenty_one(self) -> bool:
         return self._total == 21
 
