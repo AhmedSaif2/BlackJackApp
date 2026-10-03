@@ -10,6 +10,12 @@ from .participants import Action, Dealer, Participant, Player
 
 STARTING_POCKET_MONEY = 2500
 BET_OPTIONS = (10, 50, 200)
+# It's a single-player game, so the player doesn't need a name.
+PLAYER_NAME = "You"
+
+
+def new_player() -> Player:
+    return Player(PLAYER_NAME, STARTING_POCKET_MONEY)
 
 
 class Outcome(Enum):
@@ -30,7 +36,7 @@ class Round:
 
     def __init__(self, player: Player, dealer: Dealer, bet: int, deck: Optional[Deck] = None):
         if not player.place_bet(bet):
-            raise ValueError(f"{player.name} cannot afford a bet of {bet}")
+            raise ValueError(f"Cannot afford a bet of {bet}")
         self.player = player
         self.dealer = dealer
         self.bet = bet

@@ -6,21 +6,21 @@ A Python implementation of the classic Blackjack game, with a graphical interfac
 - **User-Friendly Interface**: A simple and intuitive GUI for playing Blackjack, with real playing-card images that slide in from the deck and flip face up as they are dealt.
 - **AI Dealer**: The computer player's hit/stand decisions are made by [Jev](https://www.datacamp.com/blog/system-one-models-jev), with a built-in rule-based fallback.
 - **Flexible Ace Handling**: Ace values adapt dynamically to provide the best possible hand.
-- **Interactive Gameplay**:
-  - Players can enter their name and place bets (bets you can't afford are disabled).
-  - Real-time updates to the player's and dealer's cards and scores.
-  - When you run out of money you can start over.
-- **Scoreboard**: Session stats are tracked for each player: rounds played, wins, losses, draws, win rate, blackjacks, busts, net winnings and the highest pocket money reached. They appear on the betting screen after the first round, and in the console after every round and in the closing summary.
+- **One-Screen Table**: The game opens straight on the table, with no sign-up or name prompt. You bet, play and see the result in one place. Results appear in a banner instead of pop-ups, and the last hand stays on the table until your next bet.
+- **Keyboard Play**: `1` / `2` / `3` bet 10$ / 50$ / 200$, `Enter` repeats your last bet, `H` hits and `S` stands.
+- **Saved Progress**: Your chips and stats are saved automatically and picked up next time, in both the GUI and the console. Your bet is saved as soon as it's placed, so closing the game mid-hand doesn't undo a losing hand.
+- **Scoreboard**: Rounds played, wins, losses, draws, win rate, blackjacks, busts, net winnings and the most chips you've held.
+- **Start Over Anytime**: Out of chips, or just want a clean slate? "New game" resets your chips and stats.
 - **Console Mode**: Play the same game in the terminal with `--cli`.
 
 ## How to Play
-1. Enter your name on the main screen and click "Play".
-2. Place your bet on the betting screen (10$, 50$ or 200$; you start with 2500$).
+1. Launch the game. You start with 2500$ in chips, or wherever you left off last time.
+2. Place a bet: 10$, 50$ or 200$ (or press `1`, `2`, `3`).
 3. Play your hand:
-   - Click "Hit" to draw another card.
-   - Click "Stand" to pass the turn to the dealer.
+   - "Hit" (`H`) draws another card.
+   - "Stand" (`S`) passes the turn to the dealer.
 4. The dealer plays its hand (decided by Jev), revealing its cards one by one.
-5. See the results and play again! A win pays double your bet, a draw returns it.
+5. The result shows on the table. A win pays double your bet, and a draw returns it. Bet again, or press `Enter` to repeat your last bet.
 
 ## Requirements
 - Python 3.9 or newer, with Tkinter (included with the standard Python installers for Windows and macOS; on Debian/Ubuntu install `python3-tk`).
@@ -41,6 +41,17 @@ A Python implementation of the classic Blackjack game, with a graphical interfac
    pip install .
    blackjack
    ```
+
+## Saved Progress
+Your chips and stats are kept in a small JSON file:
+
+| Platform | Location |
+| --- | --- |
+| Windows | `%APPDATA%\BlackjackApp\save.json` |
+| macOS | `~/Library/Application Support/BlackjackApp/save.json` |
+| Linux | `$XDG_CONFIG_HOME/BlackjackApp/save.json` (default `~/.config/...`) |
+
+Set `BLACKJACK_SAVE_FILE` to use a different file. Delete the file, or click "New game", to start over. If the file is missing or unreadable, the game starts fresh.
 
 ## Computer Player (Jev)
 The dealer is driven by Jev, TypeSafe AI's System One model. On every turn the dealer sends Jev its cards, its total and the player's final total as a `choice` question (`hit` / `stand`) and plays whatever Jev picks.
@@ -69,8 +80,9 @@ blackjack/
 ├── participants.py  # Player (pocket money, bets) and Dealer (deals cards, asks Jev to hit/stand)
 ├── jev.py           # Client for the Jev API (standard library only)
 ├── game.py          # Round: one hand of blackjack, shared by both front-ends
-├── stats.py         # PlayerStats: the session scoreboard, updated when a round ends
-├── gui.py           # Tkinter app: welcome, betting and game pages
+├── stats.py         # PlayerStats: the scoreboard, updated when a round ends
+├── save.py          # SaveFile: keeps your chips and stats between sessions
+├── gui.py           # Tkinter app: a single table screen
 ├── cli.py           # Console front-end
 ├── __main__.py      # Entry point (`python -m blackjack [--cli]`)
 └── assets/playing_cards/  # Card images
@@ -105,4 +117,4 @@ tests/               # Unit tests for the game logic, the console and the GUI
 ## Future Enhancements
 - Improve the UI with custom graphics or themes.
 - Implement additional game features like splitting or doubling down.
-- Save player stats between sessions and add a leaderboard across players.
+- Pay 3:2 on a natural blackjack and give the dealer a hole card, as in casino rules.
