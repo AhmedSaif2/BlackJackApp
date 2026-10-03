@@ -21,6 +21,7 @@ TEXT_COLOR = "white"
 TITLE_FONT = ("Segoe UI", 36)
 LABEL_FONT = ("Segoe UI", 20)
 BUTTON_FONT = ("Segoe UI", 15)
+SCOREBOARD_FONT = ("Segoe UI", 12)
 
 
 class CardImages:
@@ -74,6 +75,8 @@ class BettingPage(tk.Frame):
 
         _label(self, f"Welcome {player.name}").pack(pady=(90, 30))
         _label(self, f"Pocket Money = {player.pocket_money}$").pack()
+        if player.stats.rounds_played:
+            self._scoreboard(player).pack(side=tk.BOTTOM, pady=(0, 30))
 
         if not any(player.can_afford(bet) for bet in BET_OPTIONS):
             _label(self, "You're out of money!").pack(pady=(50, 30))
@@ -88,6 +91,13 @@ class BettingPage(tk.Frame):
             if not player.can_afford(bet):
                 button.config(state=tk.DISABLED)
             button.pack(side=tk.LEFT, padx=50)
+
+    def _scoreboard(self, player: Player) -> tk.Frame:
+        board = tk.Frame(self, bg=TABLE_GREEN)
+        _label(board, "Scoreboard", BUTTON_FONT).pack()
+        for line in player.stats.summary_lines():
+            _label(board, line, SCOREBOARD_FONT).pack()
+        return board
 
 
 class GamePage(tk.Frame):

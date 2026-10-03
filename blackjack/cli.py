@@ -54,6 +54,12 @@ def play_round(player: Player, dealer: Dealer, bet: int, ask: Callable[[str], st
 
     assert game.outcome is not None
     print(game.outcome.value)
+    _print_stats(player)
+
+
+def _print_stats(player: Player) -> None:
+    for line in player.stats.summary_lines():
+        print(line)
 
 
 def main(ask: Callable[[str], str] = input, delay: float = DEALER_TURN_DELAY_SECONDS) -> None:
@@ -74,3 +80,6 @@ def main(ask: Callable[[str], str] = input, delay: float = DEALER_TURN_DELAY_SEC
         print("\nYou're out of money!")
 
     print(f"Thanks for playing, {player.name}! You leave with {player.pocket_money}$.")
+    if player.stats.rounds_played:
+        print("\n-------------------------- Scoreboard --------------------------")
+        _print_stats(player)
