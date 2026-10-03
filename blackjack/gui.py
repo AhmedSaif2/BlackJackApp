@@ -5,19 +5,25 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
-from .cards import Card
+from .cards import Card, Suit
 from .game import BET_OPTIONS, STARTING_POCKET_MONEY, Outcome, Round
+from .hand import Hand
 from .participants import Dealer, Participant, Player
 
 CARD_IMAGES_DIR = Path(__file__).parent / "assets" / "playing_cards"
 # The source images are 500x726; shrinking by 7 gives roughly 72x104 cards on screen.
 CARD_IMAGE_SUBSAMPLE = 7
 DEALER_TURN_DELAY_MS = 1000
+# A dealt card slides from the deck to its place in the hand, flipping face up on the way.
+DEAL_ANIMATION_MS = 400
+DEAL_ANIMATION_FRAME_MS = 15
 
 TABLE_GREEN = "#2e8b57"  # SeaGreen, as in the original WinForms app
 TEXT_COLOR = "white"
+CARD_BACK_COLOR = "#1f3c88"
+CARD_BACK_TRIM = "#6a8cd8"
 TITLE_FONT = ("Segoe UI", 36)
 LABEL_FONT = ("Segoe UI", 20)
 BUTTON_FONT = ("Segoe UI", 15)
@@ -35,6 +41,28 @@ class CardImages:
             image = tk.PhotoImage(file=str(CARD_IMAGES_DIR / f"{name}.png"))
             self._cache[name] = image.subsample(CARD_IMAGE_SUBSAMPLE)
         return self._cache[name]
+
+    def back(self) -> tk.PhotoImage:
+        """A plain card back the same size as the faces (the assets have no back image)."""
+        if "back" not in self._cache:
+            width, height = self._size()
+            image = tk.PhotoImage(width=width, height=height)
+            image.put("white", to=(0, 0, width, height))
+            image.put(CARD_BACK_TRIM, to=(4, 4, width - 4, height - 4))
+            image.put(CARD_BACK_COLOR, to=(7, 7, width - 7, height - 7))
+            self._cache["back"] = image
+        return self._cache["back"]
+
+    def blank(self) -> tk.PhotoImage:
+        """A transparent card-sized image that holds a card's spot while it's in flight."""
+        if "blank" not in self._cache:
+            width, height = self._size()
+            self._cache["blank"] = tk.PhotoImage(width=width, height=height)
+        return self._cache["blank"]
+
+    def _size(self) -> Tuple[int, int]:
+        face = self.get(Card("ace", Suit.SPADE))
+        return face.width(), face.height()
 
 
 def _label(parent: tk.Misc, text: str = "", font=LABEL_FONT) -> tk.Label:
@@ -115,11 +143,16 @@ class GamePage(tk.Frame):
         self._stand_button.pack(side=tk.LEFT)
         _label(controls, f"Bet = {bet}$").pack(side=tk.RIGHT)
 
+        # The deck sits below the hands, in the gap between the buttons and the bet.
+        self._deck = tk.Label(self, image=card_images.back(), bg=TABLE_GREEN)
+        self._deck.place(relx=0.5, rely=1.0, anchor=tk.S, y=-10)
+
         self._round = Round(player, Dealer(), bet)
-        self._refresh_hands()
-        if not self._round.is_player_turn:
-            # Wait until the page is on screen so the player sees the cards behind the message.
-            self.after_idle(self._player_reached_twenty_one)
+        # How many of each hand's cards have been dealt onto the table so far.
+        self._shown: Dict[tk.Frame, int] = {self._dealer_cards: 0, self._player_cards: 0}
+        self._set_buttons_enabled(False)
+        # Wait until the page is on screen and laid out, so the cards have somewhere to fly to.
+        self.after_idle(lambda: self._deal_new_cards(then=self._after_player_card))
 
     def _hand_area(self, title: str):
         header = tk.Frame(self, bg=TABLE_GREEN)
@@ -132,23 +165,86 @@ class GamePage(tk.Frame):
         cards.pack_propagate(False)
         return cards, sum_label
 
-    def _refresh_hands(self) -> None:
-        self._show_hand(self._round.dealer, self._dealer_cards, self._dealer_sum)
-        self._show_hand(self._player, self._player_cards, self._player_sum)
+    def _set_buttons_enabled(self, enabled: bool) -> None:
+        state = tk.NORMAL if enabled else tk.DISABLED
+        self._hit_button.config(state=state)
+        self._stand_button.config(state=state)
 
-    def _show_hand(self, participant: Participant, cards_frame: tk.Frame, sum_label: tk.Label) -> None:
-        for card in participant.hand.cards[len(cards_frame.winfo_children()):]:
-            image = self._card_images.get(card)
-            tk.Label(cards_frame, image=image, bg=TABLE_GREEN).pack(side=tk.LEFT, padx=3, pady=12)
-        sum_label.config(text=f"Sum = {participant.hand.total}")
+    def _deal_new_cards(self, then: Callable[[], None]) -> None:
+        """Animate each card that isn't on the table yet, one at a time, then call ``then``.
 
-    def _hit(self) -> None:
-        self._round.hit()
-        self._refresh_hands()
+        The player's cards go first, the same order ``Round`` deals the opening hand in.
+        """
+        hands: List[Tuple[Participant, tk.Frame, tk.Label]] = [
+            (self._player, self._player_cards, self._player_sum),
+            (self._round.dealer, self._dealer_cards, self._dealer_sum),
+        ]
+        for participant, cards_frame, sum_label in hands:
+            if self._shown[cards_frame] < len(participant.hand):
+                self._deal_card(participant, cards_frame, sum_label, then=lambda: self._deal_new_cards(then))
+                return
+        then()
+
+    def _deal_card(
+        self, participant: Participant, cards_frame: tk.Frame, sum_label: tk.Label, then: Callable[[], None]
+    ) -> None:
+        index = self._shown[cards_frame]
+        self._shown[cards_frame] = index + 1
+        dealt = participant.hand.cards[: index + 1]
+        face, back = self._card_images.get(dealt[-1]), self._card_images.back()
+
+        # Hold the card's spot in the hand open so we know where it lands.
+        slot = tk.Label(cards_frame, image=self._card_images.blank(), bg=TABLE_GREEN)
+        slot.pack(side=tk.LEFT, padx=3, pady=12)
+        self.update_idletasks()
+        start_x, start_y = self._deck.winfo_x(), self._deck.winfo_y()
+        end_x, end_y = cards_frame.winfo_x() + slot.winfo_x(), cards_frame.winfo_y() + slot.winfo_y()
+        width = slot.winfo_width()
+
+        flyer = tk.Label(self, image=back, bg=TABLE_GREEN)
+        steps = max(1, DEAL_ANIMATION_MS // DEAL_ANIMATION_FRAME_MS)
+
+        def land() -> None:
+            flyer.destroy()
+            slot.config(image=face)
+            # Only count the card once it's on the table.
+            hand = Hand()
+            for card in dealt:
+                hand.add_card(card)
+            sum_label.config(text=f"Sum = {hand.total}")
+            then()
+
+        def move(step: int) -> None:
+            t = step / steps
+            eased = 1 - (1 - t) ** 3
+            # Flip during the second half: squeeze the back down to nothing, then widen the face.
+            flip = max(0.0, 2 * t - 1)
+            visible = max(1, round(width * abs(1 - 2 * flip)))
+            flyer.config(image=back if flip < 0.5 else face)
+            flyer.place(
+                x=round(start_x + (end_x - start_x) * eased + (width - visible) / 2),
+                y=round(start_y + (end_y - start_y) * eased),
+                width=visible,
+            )
+            if step < steps:
+                self.after(DEAL_ANIMATION_FRAME_MS, move, step + 1)
+            else:
+                land()
+
+        move(0)
+
+    def _after_player_card(self) -> None:
         if self._round.is_over:
             self._end_round()
-        elif not self._round.is_player_turn:
+        elif self._round.is_player_turn:
+            self._set_buttons_enabled(True)
+        else:
             self._player_reached_twenty_one()
+
+    def _hit(self) -> None:
+        self._set_buttons_enabled(False)
+        self._round.hit()
+        self._deal_new_cards(then=self._after_player_card)
 
     def _stand(self) -> None:
         self._round.stand()
@@ -159,17 +255,14 @@ class GamePage(tk.Frame):
         self._start_dealer_turn()
 
     def _start_dealer_turn(self) -> None:
-        self._hit_button.config(state=tk.DISABLED)
-        self._stand_button.config(state=tk.DISABLED)
+        self._set_buttons_enabled(False)
         self.after(DEALER_TURN_DELAY_MS, self._dealer_step)
 
     def _dealer_step(self) -> None:
-        card = self._round.dealer_step()
-        self._refresh_hands()
-        if card is None:
+        if self._round.dealer_step() is None:
             self._end_round()
         else:
-            self.after(DEALER_TURN_DELAY_MS, self._dealer_step)
+            self._deal_new_cards(then=lambda: self.after(DEALER_TURN_DELAY_MS, self._dealer_step))
 
     def _end_round(self) -> None:
         outcome: Optional[Outcome] = self._round.outcome
