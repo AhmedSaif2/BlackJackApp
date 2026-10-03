@@ -170,19 +170,33 @@ def find(widget: tk.Misc, cls, text=None):
 class GuiTests(unittest.TestCase):
     def setUp(self):
         self.save = temp_save(self)
-        # Run the dealer's turn without waiting a second per card.
-        delay = mock.patch.object(gui, "DEALER_TURN_DELAY_MS", 1)
-        delay.start()
-        self.addCleanup(delay.stop)
-        # Likewise, deal cards without the slide-in animation's full duration.
-        animation = mock.patch.object(gui, "DEAL_ANIMATION_MS", 1)
-        animation.start()
-        self.addCleanup(animation.stop)
+        # Every banner shown (title, subtitle), and how many of the player's cards were on the table then.
+        self.messages = []
+        self.subtitles = []
+        self.player_cards_at_message = []
+        show_banner = gui.Table._show_banner
+
+        def record_banner(table, title, subtitle, *args, **kwargs):
+            self.messages.append(title)
+            self.subtitles.append(subtitle)
+            self.player_cards_at_message.append(len(table._cards["player"]))
+            return show_banner(table, title, subtitle, *args, **kwargs)
+
+        # Run the round without waiting for the animations' full durations.
+        for patcher in (
+            mock.patch.object(gui.Table, "_show_banner", autospec=True, side_effect=record_banner),
+            mock.patch.object(gui, "DEALER_TURN_DELAY_MS", 1),
+            mock.patch.object(gui, "DEAL_ANIMATION_MS", 1),
+            mock.patch.object(gui, "BANNER_INTRO_MS", 1),
+            mock.patch.object(gui, "BLACKJACK_BANNER_MS", 1),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
         self.app = None
         self.open_app()
 
     def open_app(self, player=None):
-        """Start the app, as if ``player`` was what the last session saved."""
+        """Start the app, as if ``player`` was what the last session saved, and wait for the bets."""
         if self.app is not None:
             self.close_app()
         if player is not None:
@@ -193,6 +207,7 @@ class GuiTests(unittest.TestCase):
             self.skipTest(f"No display available: {error}")
         self.app.withdraw()
         self.table = self.app.table
+        self.wait_for(self.between_rounds)
 
     def close_app(self):
         # Cancel animation and dealer callbacks still pending, as closing the real window would.
@@ -205,7 +220,7 @@ class GuiTests(unittest.TestCase):
             self.close_app()
 
     def click(self, text):
-        (button,) = [b for b in find(self.table, tk.Button, text) if b.master.winfo_manager()]
+        (button,) = find(self.table, tk.Button, text)
         self.assertEqual(str(button.cget("state")), tk.NORMAL)
         button.invoke()
 
@@ -220,8 +235,22 @@ class GuiTests(unittest.TestCase):
     def labels(self):
         return [label.cget("text") for label in find(self.table, tk.Label)]
 
-    def banner(self):
-        return self.table.banner.cget("text")
+    def chips(self):
+        return self.table._chips_label.cget("text")
+
+    def sum_text(self, hand):
+        return self.table._table.itemcget(self.table._sum_text[hand], "text")
+
+    def offered(self):
+        """The row of buttons the banner is offering (bets or Start over), or None."""
+        canvas = self.table._table
+        for item in canvas.find_withtag("banner"):
+            if canvas.type(item) == "window":
+                return canvas.nametowidget(canvas.itemcget(item, "window"))
+        return None
+
+    def confetti(self):
+        return self.table._table.find_withtag("confetti")
 
     def wait_for(self, condition, timeout_ms=3000):
         for _ in range(timeout_ms // 10):
@@ -235,7 +264,11 @@ class GuiTests(unittest.TestCase):
         return str(self.table.hit_button.cget("state")) == tk.NORMAL
 
     def between_rounds(self):
-        return not self.table.hit_button.master.winfo_manager()
+        return self.offered() is not None
+
+    def controls_hidden(self):
+        canvas = self.table._table
+        return {canvas.itemcget(control, "state") for control in self.table._controls} == {tk.HIDDEN}
 
     def play(self, bet, ranks, *moves):
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck(*ranks)), dealer_hits_below_17():
@@ -248,97 +281,103 @@ class GuiTests(unittest.TestCase):
     def test_opens_straight_on_the_table(self):
         self.assertIsInstance(self.table, gui.Table)
         self.assertEqual(find(self.table, tk.Entry), [])
-        self.assertEqual(self.banner(), "Place your bet")
-        self.assertIn("Chips: 2500$", self.labels())
-        self.assertIn("No hands played yet", self.labels())
+        self.assertEqual((self.messages, self.subtitles), (["Blackjack"], ["Place your bet"]))
+        self.assertIs(self.offered(), self.table._bet_row)
         states = {b.cget("text"): str(b.cget("state")) for b in self.table.bet_buttons.values()}
         self.assertEqual(states, {"10$": tk.NORMAL, "50$": tk.NORMAL, "200$": tk.NORMAL})
+        self.assertEqual(self.chips(), "Chips: 2500$")
+        self.assertIn("No hands played yet", self.labels())
+        self.assertTrue(self.controls_hidden())
 
-    def test_bust_shows_result_on_the_table(self):
+    def test_bust_shows_loss_banner_and_keeps_the_hand_on_the_table(self):
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("king", "queen", "2", "5")):
             self.click("50$")
+            self.assertIsNone(self.offered())
             self.wait_for(self.player_can_act)
-            self.assertIn("Bet: 50$", self.labels())
-            self.assertIn("20", self.labels())
-            self.assertEqual(len(find(self.table.player_cards, tk.Label)), 2)
+            self.assertEqual(self.sum_text("player"), "Sum = 20")
+            self.assertEqual(len(self.table._cards["player"]), 2)
             self.click("Hit")
             self.wait_for(self.between_rounds)
-        self.assertEqual(self.banner(), "Bust! -50$")
-        self.assertIn("Chips: 2450$", self.labels())
-        self.assertIn("25 Bust", self.labels())
-        # The losing hand stays on the table until the next bet.
-        self.assertEqual(len(find(self.table.player_cards, tk.Label)), 3)
+        self.assertEqual((self.messages[-1], self.subtitles[-1]), ("You Lost!", "Bust! -50$"))
+        # No celebration for a loss, and the losing hand stays in view under the bets.
+        self.assertEqual(self.confetti(), ())
+        self.assertEqual(len(self.table._cards["player"]), 3)
+        self.assertEqual(self.chips(), "Chips: 2450$")
 
-    def test_stand_plays_dealer_turn_and_pays_out(self):
+    def test_win_celebrates_with_confetti(self):
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("10", "9", "10", "6", "king")), dealer_hits_below_17():
             self.click("200$")
             self.wait_for(self.player_can_act)
             self.click("Stand")
-            self.assertEqual(str(self.table.hit_button.cget("state")), tk.DISABLED)
+            self.assertFalse(self.player_can_act())
             self.assertEqual(str(self.table.stand_button.cget("state")), tk.DISABLED)
             self.assertEqual(str(self.table.new_game_button.cget("state")), tk.DISABLED)
             self.wait_for(self.between_rounds)
-        self.assertEqual(self.banner(), "You win! +200$")
-        self.assertIn("Chips: 2700$", self.labels())
+        self.assertEqual((self.messages[-1], self.subtitles[-1]), ("You Won!", "+200$"))
+        self.assertNotEqual(self.confetti(), ())
+        # Hit and Stand are cleared away so the banner has the row to itself.
+        self.assertTrue(self.controls_hidden())
+        self.assertEqual(self.chips(), "Chips: 2700$")
         self.assertEqual(str(self.table.new_game_button.cget("state")), tk.NORMAL)
 
-    def test_draw_and_dealer_win_banners(self):
+    def test_draw_returns_the_bet(self):
         self.play(50, ("10", "8", "10", "8"), "Stand")
-        self.assertEqual(self.banner(), "Push. Your bet is returned")
-        self.play(50, ("10", "7", "10", "9"), "Stand")
-        self.assertEqual(self.banner(), "Dealer wins. -50$")
-        self.assertIn("Chips: 2450$", self.labels())
+        self.assertEqual((self.messages[-1], self.subtitles[-1]), ("Draw!", "Your 50$ bet is returned"))
+        self.assertEqual(self.confetti(), ())
+        self.assertEqual(self.chips(), "Chips: 2500$")
 
     def test_blackjack_on_deal_skips_to_dealer(self):
-        with mock.patch("blackjack.game.Deck", return_value=stacked_deck("ace", "king", "10", "10")):
-            self.click("10$")
-            self.wait_for(lambda: self.banner() == "Blackjack!")
-            # The player's cards are on the table, and there's nothing for them to do.
-            self.assertEqual(len(find(self.table.player_cards, tk.Label)), 2)
-            self.assertFalse(self.player_can_act())
-            self.wait_for(self.between_rounds)
-        self.assertEqual(self.banner(), "Blackjack! You win +10$")
-        self.assertIn("Chips: 2510$", self.labels())
+        self.play(10, ("ace", "king", "10", "10"))
+        self.assertEqual(self.messages[1:], ["Blackjack!", "You Won!"])
+        # The player's cards must be on the table when "Blackjack!" pops up.
+        self.assertEqual(self.player_cards_at_message[1], 2)
+        self.assertEqual(self.chips(), "Chips: 2510$")
 
     def test_hitting_to_twenty_one_is_not_called_blackjack(self):
-        with mock.patch("blackjack.game.Deck", return_value=stacked_deck("5", "6", "10", "king", "7")), dealer_hits_below_17():
-            self.click("10$")
-            self.wait_for(self.player_can_act)
-            self.click("Hit")
-            self.wait_for(lambda: self.banner() == "21!")
-            self.wait_for(self.between_rounds)
-        self.assertEqual(self.banner(), "You win! +10$")
+        self.play(10, ("5", "6", "10", "king", "7"), "Hit")
+        self.assertEqual(self.messages[1:], ["21!", "You Won!"])
 
     def test_next_bet_clears_the_table(self):
         self.play(50, ("king", "queen", "2", "5"), "Hit")
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("10", "6", "3")):
             self.click("10$")
-            self.assertEqual(self.banner(), "")
-            self.assertEqual(find(self.table.player_cards, tk.Label), [])
+            self.assertEqual(self.table._table.find_withtag("banner"), ())
+            self.assertEqual(self.table._cards, {"dealer": [], "player": []})
+            self.assertEqual(self.sum_text("player"), "")
             self.wait_for(self.player_can_act)
-        self.assertEqual(len(find(self.table.player_cards, tk.Label)), 2)
-        self.assertEqual(len(find(self.table.dealer_cards, tk.Label)), 1)
+        self.assertEqual(len(self.table._cards["player"]), 2)
+        self.assertEqual(len(self.table._cards["dealer"]), 1)
+
+    def test_betting_again_mid_confetti_sweeps_it_away(self):
+        self.play(50, ("10", "9", "10", "7"), "Stand")
+        self.assertNotEqual(self.confetti(), ())
+        with mock.patch("blackjack.game.Deck", return_value=stacked_deck("10", "6", "3")):
+            self.key("Return")
+            self.assertEqual(self.confetti(), ())
+            self.wait_for(self.player_can_act)
+        self.assertEqual(self.confetti(), ())
 
     def test_keyboard_shortcuts(self):
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("king", "queen", "2", "5")):
             self.key("h")  # nothing to hit yet
             self.key("Return")  # no previous bet to repeat
-            self.assertEqual(self.banner(), "Place your bet")
+            self.assertIs(self.offered(), self.table._bet_row)
             self.key("2")
-            self.assertIn("Bet: 50$", self.labels())
+            self.assertIsNone(self.offered())
+            self.assertEqual(self.chips(), "Chips: 2450$")
             self.key("3")  # betting is closed during a hand
-            self.assertIn("Bet: 50$", self.labels())
+            self.assertEqual(self.chips(), "Chips: 2450$")
             self.wait_for(self.player_can_act)
             self.key("H")
             self.wait_for(self.between_rounds)
-        self.assertIn("Chips: 2450$", self.labels())
+        self.assertEqual(self.subtitles[-1], "Bust! -50$")
         with mock.patch("blackjack.game.Deck", return_value=stacked_deck("10", "9", "10", "7")), dealer_hits_below_17():
             self.key("Return")  # same bet again
-            self.assertIn("Bet: 50$", self.labels())
+            self.assertEqual(self.chips(), "Chips: 2400$")
             self.wait_for(self.player_can_act)
             self.key("s")
             self.wait_for(self.between_rounds)
-        self.assertIn("Chips: 2500$", self.labels())
+        self.assertEqual(self.chips(), "Chips: 2500$")
 
     def test_scoreboard_tracks_rounds(self):
         self.play(10, ("ace", "king", "10", "10"))
@@ -349,8 +388,8 @@ class GuiTests(unittest.TestCase):
     def test_progress_is_saved_and_restored(self):
         self.play(50, ("king", "queen", "2", "5"), "Hit")
         self.open_app()
-        self.assertEqual(self.banner(), "Welcome back!")
-        self.assertIn("Chips: 2450$", self.labels())
+        self.assertEqual(self.messages[-1], "Welcome back!")
+        self.assertEqual(self.chips(), "Chips: 2450$")
         self.assertIn("Rounds: 1 | Wins: 0 | Losses: 1 | Draws: 0 | Win rate: 0%", self.labels())
 
     def test_bet_is_saved_as_soon_as_it_is_placed(self):
@@ -362,60 +401,84 @@ class GuiTests(unittest.TestCase):
         self.open_app(Player("You", 60))
         states = {b.cget("text"): str(b.cget("state")) for b in self.table.bet_buttons.values()}
         self.assertEqual(states, {"10$": tk.NORMAL, "50$": tk.NORMAL, "200$": tk.DISABLED})
+        self.key("3")
+        self.assertEqual(self.chips(), "Chips: 60$")
 
     def test_out_of_chips_can_start_over(self):
         broke = Player("You", 5)
         broke.stats.record_loss(200, bust=True)
         self.open_app(broke)
-        self.assertIn("You're out of chips.", self.labels())
+        self.assertEqual(self.messages[-1], "Out of chips")
+        self.assertIs(self.offered(), self.table._start_over_row)
         self.assertIn("Rounds: 1 | Wins: 0 | Losses: 1 | Draws: 0 | Win rate: 0%", self.labels())
         self.click("Start over")
-        self.assertIn("Chips: 2500$", self.labels())
+        self.wait_for(self.between_rounds)
+        self.assertEqual(self.messages[-1], "New game")
+        self.assertIs(self.offered(), self.table._bet_row)
+        self.assertEqual(self.chips(), "Chips: 2500$")
         self.assertIn("No hands played yet", self.labels())
         self.assertEqual(self.save.load().pocket_money, 2500)
+
+    def test_losing_the_last_chips_offers_start_over(self):
+        self.open_app(Player("You", 10))
+        self.play(10, ("king", "queen", "2", "5"), "Hit")
+        self.assertEqual(self.subtitles[-1], "Bust! -10$  ·  Out of chips")
+        self.assertIs(self.offered(), self.table._start_over_row)
 
     def test_new_game_asks_first(self):
         self.play(50, ("king", "queen", "2", "5"), "Hit")
         with mock.patch.object(gui.messagebox, "askyesno", return_value=False) as ask:
             self.table.new_game_button.invoke()
         ask.assert_called_once()
-        self.assertIn("Chips: 2450$", self.labels())
+        self.assertEqual(self.chips(), "Chips: 2450$")
         with mock.patch.object(gui.messagebox, "askyesno", return_value=True):
             self.table.new_game_button.invoke()
-        self.assertIn("Chips: 2500$", self.labels())
-        self.assertEqual(find(self.table.player_cards, tk.Label), [])
+        self.wait_for(self.between_rounds)
+        self.assertEqual(self.chips(), "Chips: 2500$")
+        self.assertEqual(self.table._cards, {"dealer": [], "player": []})
         self.assertEqual(self.save.load().stats, new_player().stats)
 
-    def test_cards_slide_in_one_at_a_time(self):
-        table = self.table
+    def test_cards_fly_in_one_at_a_time(self):
+        table, canvas = self.table, self.table._table
         with mock.patch.object(gui, "DEAL_ANIMATION_MS", 150), mock.patch(
             "blackjack.game.Deck", return_value=stacked_deck("king", "queen", "2", "5")
         ):
             self.click("50$")
-            player_sum, dealer_sum = table._player_sum, table._dealer_sum
 
-            # Mid-flight: one card is moving, the hand's sum doesn't count it yet and the buttons are locked.
-            self.wait_for(lambda: len(find(table.player_cards, tk.Label)) == 1)
-            flyers = [w for w in table.winfo_children() if isinstance(w, tk.Label) and w.winfo_manager() == "place"]
-            self.assertEqual(len(flyers), 2)  # the deck and the card in flight
-            self.assertEqual(player_sum.cget("text"), "")
+            # Mid-flight: one card (and its shadow) is moving, the hand's sum doesn't count it yet
+            # and the buttons are locked.
+            self.wait_for(lambda: canvas.find_withtag("flying"))
+            self.assertEqual(len(canvas.find_withtag("flying")), 2)
+            self.assertEqual(table._cards["player"], [])
+            self.assertEqual(self.sum_text("player"), "")
             self.assertFalse(self.player_can_act())
 
             # The sum follows the cards as they land.
-            self.wait_for(lambda: player_sum.cget("text") == "10")
-            self.wait_for(lambda: player_sum.cget("text") == "20")
-            self.assertEqual(dealer_sum.cget("text"), "")
+            self.wait_for(lambda: self.sum_text("player") == "Sum = 10")
+            self.wait_for(lambda: self.sum_text("player") == "Sum = 20")
+            self.assertEqual(self.sum_text("dealer"), "")
             self.wait_for(self.player_can_act)
-            self.assertEqual(dealer_sum.cget("text"), "2")
+            self.assertEqual(self.sum_text("dealer"), "Sum = 2")
+            self.assertEqual(canvas.find_withtag("flying"), ())
 
-            # Only the deck is left placed on the table, and the hit is animated too.
-            placed = [w for w in table.winfo_children() if w.winfo_manager() == "place"]
-            self.assertEqual(placed, [table._deck])
+            # The hit is animated too, and the result waits until the card has landed.
+            banners_before = len(self.messages)
             self.click("Hit")
             self.assertFalse(self.player_can_act())
-            self.assertEqual(self.banner(), "")
+            self.assertEqual(len(self.messages), banners_before)
             self.wait_for(self.between_rounds)
-        self.assertEqual(self.banner(), "Bust! -50$")
+        self.assertEqual(self.messages[-1], "You Lost!")
+        self.assertEqual(len(table._cards["player"]), 3)
+
+    def test_flip_frames_squeeze_the_card(self):
+        images = gui.CardImages()
+        card = Card("ace", Suit.SPADE)
+        self.assertIs(images.squeezed(card, 72), images.get(card))
+        edge_on = images.squeezed(None, 1)
+        self.assertEqual((edge_on.width(), edge_on.height()), (2, 104))
+        half = images.squeezed(card, 36)
+        self.assertEqual((half.width(), half.height()), (36, 104))
+        self.assertIs(images.squeezed(card, 37), half)
 
     def test_every_card_image_loads(self):
         images = gui.CardImages()

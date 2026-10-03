@@ -3,10 +3,10 @@
 A Python implementation of the classic Blackjack game, with a graphical interface built on Tkinter and a console mode. The game logic is kept separate from both front-ends, and the project has no third-party dependencies.
 
 ## Features
-- **User-Friendly Interface**: A simple and intuitive GUI for playing Blackjack, with real playing-card images that slide in from the deck and flip face up as they are dealt.
+- **User-Friendly Interface**: A simple and intuitive GUI for playing Blackjack, with real playing-card images that arc out of the deck, casting a shadow, and turn face up as they are dealt.
 - **AI Dealer**: The computer player's hit/stand decisions are made by [Jev](https://www.datacamp.com/blog/system-one-models-jev), with a built-in rule-based fallback.
 - **Flexible Ace Handling**: Ace values adapt dynamically to provide the best possible hand.
-- **One-Screen Table**: The game opens straight on the table, with no sign-up or name prompt. You bet, play and see the result in one place. Results appear in a banner instead of pop-ups, and the last hand stays on the table until your next bet.
+- **One-Screen Table**: The game opens straight on the table, with no sign-up or name prompt. You bet, play and see the result in one place. Results appear in animated banners instead of pop-ups, and the last hand stays on the table until your next bet.
 - **Keyboard Play**: `1` / `2` / `3` bet 10$ / 50$ / 200$, `Enter` repeats your last bet, `H` hits and `S` stands.
 - **Saved Progress**: Your chips and stats are saved automatically and picked up next time, in both the GUI and the console. Your bet is saved as soon as it's placed, so closing the game mid-hand doesn't undo a losing hand.
 - **Scoreboard**: Rounds played, wins, losses, draws, win rate, blackjacks, busts, net winnings and the most chips you've held.
@@ -20,7 +20,7 @@ A Python implementation of the classic Blackjack game, with a graphical interfac
    - "Hit" (`H`) draws another card.
    - "Stand" (`S`) passes the turn to the dealer.
 4. The dealer plays its hand (decided by Jev), revealing its cards one by one.
-5. The result shows on the table. A win pays double your bet, and a draw returns it. Bet again, or press `Enter` to repeat your last bet.
+5. The result pops up on the table (wins are celebrated with confetti), and the bet buttons appear right in the banner. A win pays double your bet, and a draw returns it. Bet again, or press `Enter` to repeat your last bet.
 
 ## Requirements
 - Python 3.9 or newer, with Tkinter (included with the standard Python installers for Windows and macOS; on Debian/Ubuntu install `python3-tk`).
@@ -92,8 +92,8 @@ tests/               # Unit tests for the game logic, the console and the GUI
 ## Code Highlights
 - **Ace Handling**: Flexible Ace logic ensures optimal hand value without exceeding 21.
 - **UI-independent game logic**: `Round` steps through a hand (`hit`, `stand`, `dealer_step`) without any I/O, so the GUI and console share exactly the same rules.
-- **Page Navigation**: Each screen is a Tkinter frame; the app swaps pages through callbacks.
 - **Dynamic Gameplay**: Dealer's cards are revealed one by one to enhance realism.
+- **In-game results**: The table is a single Tkinter canvas, so results appear as animated banners over it instead of pop-up windows: a confetti burst for a win or blackjack, a drop-in banner for a loss.
 
 ## Technologies Used
 - **Programming Language**: Python
